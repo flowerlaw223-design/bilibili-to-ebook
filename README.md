@@ -79,7 +79,7 @@ ASR 跑 13 分钟、模型下载 6 分钟，中断一次不必从头再来。
 | 3 | 清洗：合并短句、去噪、**术语归正**、段落化 | `cleaned_paragraphs.json` |
 | 4 | 章节切分（简介时间点 > 多 P > 语义转折 > 时长兜底） | `chapters.json` |
 | 5 | 口语 → 书面改写（可选，保真红线见下） | — |
-| 6 | 关键帧抽帧 + OCR 配图（可选） | `frames/*.png` |
+| 6 | 关键帧抽帧 + OCR + 字幕带过滤 + 幻灯片聚类配图 | `figures.json` + `frames/*.jpg` |
 | 7 | EPUB / DOCX 构建（pandoc） | `book.epub` |
 | 8 | 审计：覆盖对账 + EPUB 结构校验 | `EBOOK_AUDIT.md` |
 
@@ -126,6 +126,8 @@ bilibili-to-ebook/
 - [x] **术语表插件化**：`terms/ai-coding.json`（68 条），可继续加金融 / 医学等
 - [x] **零依赖 EPUB 构建**：内置纯 Python EPUB3 构建器，pandoc 缺失时自动回退
 - [x] **跨平台**：字体自动探测（Windows / macOS / Linux），无 PowerShell 依赖
+- [x] **配图版**：抽帧 + OCR + 字幕带过滤 + 幻灯片聚类 → 每章 3 张图（`bbook frames`）
+- [ ] **精编版**：口语 → 书面改写（默认不做，保真是当前底线）
 - [ ] **精编版**：口语 → 书面改写
 - [ ] **配图版**：抽帧 + OCR 插入章节
 - [ ] **多 P / 合集** → 一整本书

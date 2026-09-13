@@ -73,6 +73,13 @@ def cmd_asr(a):
     A.transcribe(wd, files[0], size=a.model, language=a.lang)
 
 
+def cmd_frames(a):
+    from . import frames as FR
+    wd = WorkDir(a.workdir)
+    FR.run(wd, url=a.url, interval=a.interval, max_height=a.max_height,
+           max_per_chapter=a.per_chapter, min_chars=a.min_chars, cookies=a.cookies)
+
+
 def cmd_clean(a):
     wd = WorkDir(a.workdir)
     T.run(wd, Path(a.terms) if a.terms else None)
@@ -162,6 +169,14 @@ def main(argv=None):
 
     p = add("asr", cmd_asr, help="Phase 2：本地转写")
     p.add_argument("workdir"); p.add_argument("--model", default="small"); p.add_argument("--lang", default="zh")
+
+    p = add("frames", cmd_frames, help="Phase 6：抽帧 + OCR + 章节配图")
+    p.add_argument("workdir"); p.add_argument("--url")
+    p.add_argument("--interval", type=int, default=10, help="抽帧间隔秒数")
+    p.add_argument("--max-height", type=int, default=720)
+    p.add_argument("--per-chapter", type=int, default=3, help="每章最多几张图")
+    p.add_argument("--min-chars", type=int, default=20, help="判定幻灯片的最少字数")
+    p.add_argument("--cookies")
 
     p = add("clean", cmd_clean, help="Phase 3：清洗 + 术语归正")
     p.add_argument("workdir"); p.add_argument("--terms")

@@ -59,6 +59,7 @@ def build_markdown(wd: WorkDir) -> Path:
     meta = J(wd.book_meta, {})
     terms = J(wd.terms, [])
     quotes = J(wd.quotes, [])
+    figures = J(wd.p("figures.json"), [])
     if not paras:
         raise RuntimeError("缺少 %s，请先运行 clean 阶段" % wd.fixed)
 
@@ -101,8 +102,18 @@ def build_markdown(wd: WorkDir) -> Path:
             L += [head, ""]
         if c.get("intro"):
             L += ["【本章导读】" + c["intro"], ""]
-        for p in seg:
+        fig_at = {}
+        for f in figures:
+            if f.get("chapter") == i:
+                fig_at.setdefault(f.get("para_index"), []).append(f)
+        for j, p in enumerate(seg, start=c["from"]):
             L += [p["text"], ""]
+            for f in fig_at.get(j, []):
+                img = wd.p("frames", f["file"])
+                if img.exists():
+                    # 用相对路径（相对 book.md 所在目录）：pandoc 对 Windows 反斜杠绝对路径不可靠
+                    rel = img.relative_to(wd.root).as_posix()
+                    L += ["![%s](%s){width=6.5in}" % (f["caption"], rel), ""]
 
     if terms:
         L += ["# 附录A · 术语表", "", "| 术语 | 说明 | 出现位置 |", "|---|---|---|"]
@@ -118,8 +129,8 @@ def build_markdown(wd: WorkDir) -> Path:
         L += ["# 附录C · 版权与来源说明", ""] + meta["source_note"].split("\n") + [""]
 
     wd.book_md.write_text("\n".join(L), encoding="utf-8")
-    print("book.md: %d 字 | 正文 %d 字 | %d 章"
-          % (len("\n".join(L)), sum(len(p["text"]) for p in paras), len(chapters)))
+    print("book.md: %d 字 | 正文 %d 字 | %d 章 | 配图 %d 张"
+          % (len("\n".join(L)), sum(len(p["text"]) for p in paras), len(chapters), len(figures)))
     return wd.book_md
 
 
@@ -128,11 +139,14 @@ def build_epub_pandoc(wd: WorkDir) -> Path | None:
     pandoc = find_tool("pandoc")
     if not pandoc:
         return None
-    cmd = [pandoc, str(wd.book_md), "-o", str(wd.epub), "--toc", "--toc-depth=2",
+    cmd = [pandoc, wd.book_md.name, "-o", wd.epub.name, "--toc", "--toc-depth=2",
            "--metadata", "lang=zh-CN"]
     if wd.cover.exists():
-        cmd.append("--epub-cover-image=" + str(wd.cover))
-    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        cmd.append("--epub-cover-image=" + wd.cover.name)
+    # 必须在工作目录下执行：pandoc 按 cwd（而非输入文件所在目录）解析相对图片路径，
+    # 否则插图会变成指向 EPUB 外部的死链。
+    r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                       cwd=str(wd.root))
     if r.returncode != 0:
         print("  [warn] pandoc 构建失败，将回退到内置构建器：%s" % (r.stderr or "")[-200:])
         return None
@@ -227,8 +241,9 @@ def build_docx(wd: WorkDir) -> Path | None:
     pandoc = find_tool("pandoc")
     if not pandoc:
         return None
-    r = subprocess.run([pandoc, str(wd.book_md), "-o", str(wd.docx), "--toc"],
-                       capture_output=True, text=True, encoding="utf-8")
+    r = subprocess.run([pandoc, wd.book_md.name, "-o", wd.docx.name, "--toc"],
+                       capture_output=True, text=True, encoding="utf-8",
+                       cwd=str(wd.root))
     return wd.docx if r.returncode == 0 else None
 
 
@@ -251,14 +266,17 @@ def audit(wd: WorkDir) -> dict:
             res["chapters"] = 0
         res["has_cover"] = any("cover" in n.lower() and n.lower().endswith((".png", ".jpg"))
                                for n in names)
+        res["images"] = len([n for n in names
+                             if n.lower().endswith((".png", ".jpg", ".jpeg"))])
         plain = re.sub(r"<[^>]+>", "", "".join(
             z.read(n).decode("utf-8", "ignore") for n in names if n.endswith(".xhtml")))
         present = sum(1 for p in paras if p["text"][:24] in plain)
         res["covered"] = present
         res["coverage"] = round(present / max(1, len(paras)) * 100, 1)
     res["ok"] = bool(res["mimetype_ok"] and res.get("coverage", 0) >= 98)
-    print("审计：mimetype=%s | 条目 %d | 章节 %d/%d | 封面 %s | 覆盖 %d/%d (%s%%) -> %s"
-          % (res["mimetype_ok"], res["entries"], res["chapters"], res["xhtml_files"], res["has_cover"],
+    print("审计：mimetype=%s | 条目 %d | 章节 %d/%d | 封面 %s | 图片 %d | 覆盖 %d/%d (%s%%) -> %s"
+          % (res["mimetype_ok"], res["entries"], res["chapters"], res["xhtml_files"],
+             res["has_cover"], res.get("images", 0),
              res["covered"], res["paragraphs"], res["coverage"],
              "PASS" if res["ok"] else "FAIL"))
     return res
