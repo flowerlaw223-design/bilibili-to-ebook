@@ -180,6 +180,8 @@ def build_epub_pure(wd: WorkDir) -> Path:
     md = re.sub(r"^\|[^\n]*\|\s*$", "", md, flags=re.M)            # 去表格
     meta = json.loads(wd.book_meta.read_text(encoding="utf-8")) if wd.book_meta.exists() else {}
     title = meta.get("title", "ebook")
+    media: dict = {}          # EPUB 内部路径 -> 字节；兜底版也要能嵌图
+    img_re = re.compile(r"^!\[(?P<alt>[^\]]*)\]\((?P<src>[^)]+)\)(?:\{width=[^}]*\})?\s*$")
     blocks = re.split(r"(?m)^# ", md)[1:]
     docs, toc = [], []
     for i, blk in enumerate(blocks, 1):
@@ -190,7 +192,23 @@ def build_epub_pure(wd: WorkDir) -> Path:
             ln = ln.rstrip()
             if not ln:
                 body.append("")
-            elif ln.startswith("> "):
+                continue
+            mi = img_re.match(ln)
+            if mi:
+                alt = mi.group("alt")
+                p = Path(mi.group("src"))
+                if not p.is_absolute():
+                    p = wd.root / mi.group("src")
+                if p.exists():
+                    name = "media/img%03d%s" % (len(media), p.suffix.lower() or ".jpg")
+                    media[name] = p.read_bytes()
+                    body.append('<figure><img src="%s" alt="%s"/>'
+                                "<figcaption>%s</figcaption></figure>"
+                                % (name, html.escape(alt, quote=True), html.escape(alt)))
+                else:
+                    body.append("<p>[缺图] %s</p>" % html.escape(alt))
+                continue
+            if ln.startswith("> "):
                 body.append("<blockquote>%s</blockquote>" % html.escape(ln[2:]))
             else:
                 body.append("<p>%s</p>" % html.escape(ln))
@@ -220,6 +238,8 @@ def build_epub_pure(wd: WorkDir) -> Path:
         z.writestr("OEBPS/style.css", style)
         for name, _, body in docs:
             z.writestr("OEBPS/" + name, body)
+        for name, blob in media.items():
+            z.writestr("OEBPS/" + name, blob)
         if wd.cover.exists():
             z.writestr("OEBPS/cover.png", wd.cover.read_bytes())
 
@@ -227,6 +247,10 @@ def build_epub_pure(wd: WorkDir) -> Path:
             '<item id="%s" href="%s" media-type="application/xhtml+xml"%s/>'
             % (n[:-6], n, ' properties="nav"' if n == "nav.xhtml" else "")
             for n, _, _ in docs)
+        for name in media:
+            mt = "image/png" if name.endswith(".png") else "image/jpeg"
+            manifest += ('\n<item id="%s" href="%s" media-type="%s"/>'
+                         % (name.replace("/", "-").replace(".", "-"), name, mt))
         if wd.cover.exists():
             manifest += ('\n<item id="cover-image" href="cover.png" media-type="image/png" '
                          'properties="cover-image"/>')
@@ -244,7 +268,8 @@ def build_epub_pure(wd: WorkDir) -> Path:
                    '<meta property="dcterms:modified">%s</meta>\n'
                    "</metadata>\n<manifest>\n%s\n</manifest>\n<spine>\n%s\n</spine>\n"
                    "</package>" % (__import__("uuid").uuid4(), html.escape(title),
-                                   __import__("datetime").datetime.utcnow()
+                                   __import__("datetime").datetime.now(
+                                       __import__("datetime").timezone.utc)
                                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
                                    manifest, spine))
     print("  [fallback] 使用内置 EPUB 构建器生成（%d 章）" % len(docs))

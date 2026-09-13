@@ -20,7 +20,8 @@ PAGE_RE = re.compile(r"\b\d{1,3}\s*/\s*\d{1,3}\b")
 
 
 def _tokens(text: str) -> set:
-    return set(re.findall(r"[\u4e00-\u9fff]|[A-Za-z][A-Za-z0-9_\-]+", text))
+    """单字母也算 token：幻灯片角落的 'G' 之类 OCR 残渣每帧都有，必须能被识别成装饰。"""
+    return set(re.findall(r"[\u4e00-\u9fff]|[A-Za-z][A-Za-z0-9_\-]*", text))
 
 
 def detect_chrome(frames_ocr: list[dict], ratio: float = 0.4) -> set:
@@ -43,26 +44,33 @@ def clean_slide(text: str, chrome: set) -> str:
     t = re.sub(r"[\u4e00-\u9fff]+|[A-Za-z][A-Za-z0-9_\-/\.]*|\d+", 
                lambda m: "" if (m.group(0).isascii() and m.group(0).lower() in chrome)
                else (" " if (m.group(0) in chrome) else m.group(0)), t)
+    t = re.sub(r"[&§@#]+", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
     return t
 
 
 def slide_segments(frames_ocr: list[dict], sim: float = 0.5) -> list[dict]:
+    """按"与上一帧的相似度"切分幻灯片。
+
+    注意：不能拿"累积 token 集合"去比 —— 中文单字重叠率高，集合越滚越大，
+    几十帧下来会把整段视频并成一块。只比相邻两帧才是稳定的换页检测。
+    """
     chrome = detect_chrome(frames_ocr)
-    segs, cur = [], None
+    segs, cur, prev = [], None, None
     for o in frames_ocr:
         ct = clean_slide(o.get("text", ""), chrome)
         s = _tokens(ct)
         if cur is None:
-            cur = {"t": o["t"], "texts": [ct], "toks": s}
-            continue
-        j = len(cur["toks"] & s) / max(1, len(cur["toks"] | s))
-        if j >= sim:
-            cur["texts"].append(ct)
-            cur["toks"] |= s
+            cur = {"t": o["t"], "texts": [ct], "toks": set(s)}
         else:
-            segs.append(cur)
-            cur = {"t": o["t"], "texts": [ct], "toks": s}
+            j = len(prev & s) / max(1, len(prev | s))
+            if j >= sim:
+                cur["texts"].append(ct)
+                cur["toks"] |= s
+            else:
+                segs.append(cur)
+                cur = {"t": o["t"], "texts": [ct], "toks": set(s)}
+        prev = s
     if cur:
         segs.append(cur)
     out = []
@@ -96,6 +104,12 @@ TITLE_MARK = re.compile(r"(GEN\s*\d|第\s*[一二三四五六七八九十\d]+\s*
 
 
 def pick_title_cards(segs: list[dict], max_chars: int = 48, min_chars: int = 4) -> list[dict]:
+    """标题卡 = 带结构标记（GEN/第X章/规律）且明显偏短的页。
+
+    阈值曾尝试做成"随视频自适应"（取分段长度中位数的一半），但在幻灯片长度比较
+    均匀的视频上会把阈值压到 20 出头，导致一张卡都识别不出来 —— 已回退为固定值，
+    该值在 46 分钟真实视频上验证可用（内容页 74~213 字 vs 标题卡 20~45 字）。
+    """
     cards = []
     for s in segs:
         t = s["text"]

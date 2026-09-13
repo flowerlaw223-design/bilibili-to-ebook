@@ -1,0 +1,82 @@
+[
+ {
+  "index": 0,
+  "file": "f_00001.jpg",
+  "t": 5,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 AI Agent 的五代演变 从被动文本生成到工具调用 再到工程化工作流 标准协议 常驻自治与闭环前瞻",
+  "chars": 75,
+  "dropped": 0
+ },
+ {
+  "index": 1,
+  "file": "f_00002.jpg",
+  "t": 15,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 AI Agent 的五代演变 每一次跃迁背后的底层逻辑到底是什么 是模型变强了 还是工具系统变成熟了 还是工程架构变成熟了",
+  "chars": 85,
+  "dropped": 0
+ },
+ {
+  "index": 2,
+  "file": "f_00003.jpg",
+  "t": 25,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 AI Agent 的五代演变 为什么这个行业总是反复出现各种炒作泡沫 为什么那么多的提示词工程师和 GPT Store 都会走向灭亡 哪些是真正的护城河",
+  "chars": 100,
+  "dropped": 0
+ },
+ {
+  "index": 3,
+  "file": "f_00004.jpg",
+  "t": 125,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 &l500 01 GEN1/2023中-2023末 工具调用的觉醒",
+  "chars": 57,
+  "dropped": 0
+ },
+ {
+  "index": 4,
+  "file": "f_00005.jpg",
+  "t": 135,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 GEN1 历史拐点 2023年6月13日 function calling 发布 模型不再仅生成给人看的自然语言 而是开始生成机器可读的结构化指令 用户请求进入模型推理输出调用 外部 API 执行再把结果返回给模型",
+  "chars": 131,
+  "dropped": 0
+ },
+ {
+  "index": 5,
+  "file": "f_00006.jpg",
+  "t": 145,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 GEN1 架构意义 大脑加四肢的第一次合体 在此之前开发者要用复杂的正则表达式从模型的自然语言里猜参数 格式稍变就会失败 现在模型直接输出结构化 JSON",
+  "chars": 101,
+  "dropped": 0
+ },
+ {
+  "index": 6,
+  "file": "f_00007.jpg",
+  "t": 245,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 &1502 GEN2/2023末-2024 从黑盒魔法到工程化架构",
+  "chars": 57,
+  "dropped": 0
+ },
+ {
+  "index": 7,
+  "file": "f_00008.jpg",
+  "t": 255,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 GEN2 结构化编排 把模型的思考放到一个可控的流程里面去 可靠性不再寄希望于模型一次性生成完美答案 而是依附于人类设计的软件工程结构",
+  "chars": 91,
+  "dropped": 0
+ },
+ {
+  "index": 8,
+  "file": "f_00009.jpg",
+  "t": 355,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 &l503 GEN3/2024Q4-2025 标准化协议与行动空间革命",
+  "chars": 59,
+  "dropped": 0
+ },
+ {
+  "index": 9,
+  "file": "f_00010.jpg",
+  "t": 365,
+  "text": "Gen0 G en1 Gen2 Gen3 结论 GEN3 MCP 协议把 M 乘 N 的集成噩梦降低成 M 加 N 复杂度 每个工具只需要实现一次标准化接口 所有支持 MCP 的客户端都可以直接使用",
+  "chars": 99,
+  "dropped": 0
+ }
+]

@@ -26,6 +26,7 @@ dependencies = [
 asr = ["faster-whisper>=1.0"]        # 本地转写（免费、离线）
 ocr = ["rapidocr-onnxruntime>=1.3"]  # 幻灯片识别配图
 all = ["faster-whisper>=1.0", "rapidocr-onnxruntime>=1.3"]
+dev = ["pytest>=7.0"]
 
 [project.scripts]
 bbook = "bbook.cli:main"

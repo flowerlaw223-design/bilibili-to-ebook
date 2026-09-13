@@ -145,26 +145,36 @@ ASR 跑 13 分钟、模型下载 6 分钟，中断一次不必从头再来。
 | B 站搜索接口 | ❌ 风控（412），请直接传 BV 号 |
 | pandoc 2.12 | ⚠️ 不支持 `--split-level`；无 xelatex 则不能直出 PDF |
 | 术语归正 | ⚠️ **不能用 `\b`**：中英之间无词边界，必须用 lookaround |
-| huggingface_hub | ⚠️ 可能下载失败，改用 requests 直拉模型文件（见 `docs/PITFALLS.md`） |
+| huggingface_hub | ⚠️ 可能下载失败，改用 requests 直拉模型文件（已内置该回退） |
+| Windows 管道输出 | ⚠️ 控制台默认 GBK，非 tty 时强制 UTF-8，否则打印 emoji 会直接崩 |
+| 幻灯片标题卡 | ⚠️ 阈值不能"自适应"：幻灯片长度均匀时会把阈值压到 20 出头，一张卡都认不出 |
 
 ## 目录结构
 
 ```
 bilibili-to-ebook/
-├── README.md
-├── SECURITY.md              # 凭据政策（上 GitHub 前必读）
+├── README.md · SECURITY.md · LICENSE · pyproject.toml · .gitignore
+├── .github/workflows/ci.yml        # Linux + Windows × py3.9/3.12，跑测试与发布前扫描
 ├── skills/
-│   ├── SKILL_BILIBILI_TO_EBOOK.md      # 流水线权威指令（给 LLM 读的）
-│   └── SKILL_MSE435_FIDELITY_EDITION.md
-├── src/                     # 流水线脚本（待参数化）
-├── tools/
-│   ├── preflight_scan.py    # 发布前凭据/大文件/版权扫描
-│   └── check_cookies.py     # cookie 有效期检测
-├── examples/                # 用 CC 授权视频产出的示例电子书
-└── docs/
-    ├── PIPELINE.md
-    └── PITFALLS.md
+│   └── SKILL_BILIBILI_TO_EBOOK.md  # 流水线权威指令（给 LLM / 人读的规范）
+├── src/bbook/                      # 实现（11 个模块）
+│   ├── paths.py     工作目录契约 · 断点续跑状态 · 跨平台字体/工具探测
+│   ├── fetch.py     Phase 1-2：元数据 / 官方字幕 / 音频 / 弹幕 / cookie 校验
+│   ├── asr.py       Phase 2：faster-whisper 本地转写（模型自动下载、镜像回退）
+│   ├── text.py      Phase 3：段落化 + 术语归正（CJK 安全 lookaround）
+│   ├── chapters.py  Phase 4：自动切章（简介时间点 → 幻灯片标题卡 → 时长兜底）
+│   ├── frames.py    Phase 6：抽帧 + OCR + 字幕带过滤 + 幻灯片聚类
+│   ├── book.py      Phase 7-8：Markdown / EPUB / DOCX 构建 + 审计
+│   ├── series.py    多 P / 合集 → 一整本书
+│   └── cli.py       CLI 入口（12 个子命令）
+├── terms/ai-coding.json            # 可插拔术语表（AI / 编程领域，68 条）
+├── tests/                          # pytest 用例 + 假数据夹具（不需要模型即可跑）
+│   ├── test_text.py · test_chapters.py · test_book.py · test_paths.py
+│   └── fixtures/                   # 合成 ASR 分段 / 幻灯片 OCR / 视频简介
+└── tools/preflight_scan.py         # 发布前扫描：凭据 / 大文件 / 版权风险
 ```
+
+> `examples/`（用 CC 授权视频产出的示例电子书）与 `docs/` 尚未创建，见路线图。
 
 ## 路线图
 
