@@ -8,7 +8,7 @@ B站 / YouTube 长视频 → 带封面、目录、章节、配图、术语表的
 
 本地转写 · 自动切章 · 不依赖任何付费 API · **一本约 ¥0.2**
 
-![CI](https://github.com/flowerlaw223-design/bilibili-to-ebook/actions/workflows/ci.yml/badge.svg)
+![CI](https://img.shields.io/badge/CI-pending%20workflow%20scope-lightgrey.svg)
 ![License](https://img.shields.io/badge/code-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
