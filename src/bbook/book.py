@@ -83,9 +83,15 @@ def build_markdown(wd: WorkDir) -> Path:
         L += ["# 关于本书", ""] + meta["about"].split("\n") + [""]
 
     L += ["# 目录与时间轴", "", "| 章 | 标题 | 视频时间 | 字数 |", "|---|---|---|---|"]
+    def stamp(c, seg):
+        """合集场景下每个分 P 的时间都从 00:00 开始，必须带 P 号才不误导。"""
+        if not seg:
+            return "-"
+        return ("P%s " % c["part"] if c.get("part") else "") + seg[0]["t"]
+
     for i, c in enumerate(chapters, 1):
         seg = paras[c["from"]:min(c["to"], len(paras))]
-        L.append("| %d | %s | %s | %d |" % (i, c["title"], seg[0]["t"] if seg else "-",
+        L.append("| %d | %s | %s | %d |" % (i, c["title"], stamp(c, seg),
                                             sum(len(p["text"]) for p in seg)))
     L.append("")
 
@@ -94,11 +100,12 @@ def build_markdown(wd: WorkDir) -> Path:
         L += ["# 第%d章 %s" % (i, c["title"]), ""]
         link = meta.get("time_link")
         if seg:
-            ts = seg[0]["t"]
+            ts = stamp(c, seg)
             head = "> 视频时间点：%s 起" % ts
             if link:
                 secs = int(seg[0]["start"])
-                head += "（[跳转原片](%s&t=%d)）" % (link, secs)
+                sep = "&" if "?" in link else "?"
+                head += "（[跳转原片](%s%st=%d)）" % (link, sep, secs)
             L += [head, ""]
         if c.get("intro"):
             L += ["【本章导读】" + c["intro"], ""]
@@ -109,10 +116,10 @@ def build_markdown(wd: WorkDir) -> Path:
         for j, p in enumerate(seg, start=c["from"]):
             L += [p["text"], ""]
             for f in fig_at.get(j, []):
-                img = wd.p("frames", f["file"])
-                if img.exists():
-                    # 用相对路径（相对 book.md 所在目录）：pandoc 对 Windows 反斜杠绝对路径不可靠
-                    rel = img.relative_to(wd.root).as_posix()
+                # 用相对路径（相对 book.md 所在目录）：pandoc 对 Windows 反斜杠绝对路径不可靠。
+                # 合集场景下图片在 part-00N/frames/ 下，路径由 series.merge 预先写入 rel。
+                rel = f.get("rel") or f["file"]
+                if wd.p(rel).exists():
                     L += ["![%s](%s){width=6.5in}" % (f["caption"], rel), ""]
 
     if terms:

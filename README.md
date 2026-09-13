@@ -65,6 +65,37 @@ python -m bbook build  work/BVxxx                        # Phase 7-8 构建 + �
 **为什么 `run` 会停在章节划分？** 因为"哪里是一章、这一章叫什么"是需要判断的事，
 脚本不猜。你（或 LLM）填好 `chapters.json` 后重跑 `build` 即可。
 
+> 例外：**合集模式不需要人工切章**——一个分 P 天然就是一章，标题直接取 B 站分 P 名。
+
+### 合集 / 多 P：一条命令出一本书
+
+```bash
+python -m bbook series "https://www.bilibili.com/video/BVxxxxxxxxxx/" \
+       --limit 3 \            # 先试跑前 3 个分 P（不填则全部）
+       --parts 1,3,5 \        # 或指定分 P
+       --interval 15 \        # 抽帧间隔
+       --terms terms/ai-coding.json
+```
+
+目录结构：**一个分 P 一个工作目录**，各 P 独立跑完 Phase 1–6，最后合并成一本书：
+
+```
+work/<id>-series/
+├── series.json          合集与分 P 清单
+├── part-001/            该 P 的完整中间产物（与单视频工作目录同构）
+├── part-002/
+├── chapters.json        一章 = 一个分 P
+├── figures.json         合并后的配图（索引已换算为全局段落号）
+└── book.epub
+```
+
+三点实测结论：
+
+1. **不要用 yt-dlp 取分 P 标题**——合集里每个 P 返回的都是同一个合集标题。
+   必须用 B 站 `view` 接口的 `pages[].part`（本项目已内置）。
+2. 分 P 名常带编号和画质后缀（`1-1.课程开场-1080P 高清-AVC`），会自动清洗成 `课程开场`。
+3. 各 P 时间都从 00:00 开始，所以时间轴必须带 P 号（`P1 00:00:00`），否则读者会误以为全书时间连续。
+
 ### 断点续跑
 
 每个阶段完成后会写入 `work/<id>/state.json`。中断后重跑 `run` 会跳过已完成的阶段——
@@ -130,7 +161,7 @@ bilibili-to-ebook/
 - [ ] **精编版**：口语 → 书面改写（默认不做，保真是当前底线）
 - [ ] **精编版**：口语 → 书面改写
 - [ ] **配图版**：抽帧 + OCR 插入章节
-- [ ] **多 P / 合集** → 一整本书
+- [x] **多 P / 合集** → 一整本书：**一章 = 一个分 P**，标题自动取自 B 站分 P 名（`bbook series`）
 - [ ] **可点击时间戳**：EPUB 内链跳回视频对应秒数
 - [ ] **CI**：假 ASR 输出的 golden test + lint（不需要下载模型即可跑）
 

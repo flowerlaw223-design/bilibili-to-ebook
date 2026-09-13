@@ -80,6 +80,21 @@ def cmd_frames(a):
            max_per_chapter=a.per_chapter, min_chars=a.min_chars, cookies=a.cookies)
 
 
+def cmd_series(a):
+    from . import series as S
+    wd = WorkDir(a.workdir or Path("work") / (_slug(a.url) + "-series"))
+    parts = [int(x) for x in a.parts.split(",")] if a.parts else None
+    S.run(wd, a.url, limit=a.limit, parts=parts, cookies=a.cookies,
+          terms=Path(a.terms) if a.terms else None, model=a.model,
+          frames=not a.no_frames, frame_interval=a.interval, per_chapter=a.per_chapter)
+    print("\n构建电子书")
+    B.build_markdown(wd)
+    B.build_epub(wd)
+    B.build_docx(wd)
+    B.audit(wd)
+    print("产物：%s" % wd.epub)
+
+
 def cmd_clean(a):
     wd = WorkDir(a.workdir)
     T.run(wd, Path(a.terms) if a.terms else None)
@@ -177,6 +192,16 @@ def main(argv=None):
     p.add_argument("--per-chapter", type=int, default=3, help="每章最多几张图")
     p.add_argument("--min-chars", type=int, default=20, help="判定幻灯片的最少字数")
     p.add_argument("--cookies")
+
+    p = add("series", cmd_series, help="多 P / 合集 → 一整本书")
+    p.add_argument("url"); p.add_argument("--workdir")
+    p.add_argument("--limit", type=int, help="只处理前 N 个分 P")
+    p.add_argument("--parts", help="指定分 P，逗号分隔，如 1,3,5")
+    p.add_argument("--terms", default="terms/ai-coding.json")
+    p.add_argument("--cookies"); p.add_argument("--model", default="small")
+    p.add_argument("--no-frames", action="store_true")
+    p.add_argument("--interval", type=int, default=15)
+    p.add_argument("--per-chapter", type=int, default=3)
 
     p = add("clean", cmd_clean, help="Phase 3：清洗 + 术语归正")
     p.add_argument("workdir"); p.add_argument("--terms")

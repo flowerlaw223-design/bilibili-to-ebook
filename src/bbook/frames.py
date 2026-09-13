@@ -145,7 +145,12 @@ def assign_to_chapters(wd: WorkDir, slides: list[dict],
     """按时间戳把幻灯片分配到章节，并定位到最近的段落（供插图）。"""
     paras = json.loads((wd.fixed if wd.fixed.exists() else wd.paragraphs)
                        .read_text(encoding="utf-8"))
-    chapters = json.loads(wd.chapters.read_text(encoding="utf-8"))
+    # 合集场景下每个分 P 没有自己的 chapters.json —— 此时把整个 P 当成一章处理，
+    # 章号由 series.merge 在合并时重新编号。
+    if wd.chapters.exists():
+        chapters = json.loads(wd.chapters.read_text(encoding="utf-8"))
+    else:
+        chapters = [{"title": "", "from": 0, "to": len(paras)}]
     figures = []
     for ci, c in enumerate(chapters, 1):
         lo, hi = c["from"], min(c["to"], len(paras))

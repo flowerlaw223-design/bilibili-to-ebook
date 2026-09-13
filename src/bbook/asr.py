@@ -6,6 +6,13 @@ from pathlib import Path
 from .paths import WorkDir
 
 DEFAULT_REPO = "Systran/faster-whisper-{size}"
+
+def model_home() -> Path:
+    """模型缓存目录：多个工作目录 / 多个分 P 共用一份，避免重复下载 460MB。"""
+    env = os.environ.get("BBOOK_MODEL_DIR")
+    if env:
+        return Path(env)
+    return Path.home() / ".cache" / "bbook" / "models"
 MIRRORS = ["https://hf-mirror.com", "https://huggingface.co"]
 MODEL_FILES = ["config.json", "model.bin", "tokenizer.json", "vocabulary.txt"]
 
@@ -54,7 +61,12 @@ def transcribe(wd: WorkDir, audio: Path, size: str = "small", language: str = "z
                prompt: str = ZH_PROMPT, threads: int | None = None,
                model_dir: Path | None = None) -> dict:
     from faster_whisper import WhisperModel
-    model_dir = Path(model_dir) if model_dir else wd.p("models", "faster-whisper-%s" % size)
+    if model_dir:
+        model_dir = Path(model_dir)
+    else:
+        # 优先复用工作目录里的旧副本，否则用全局缓存
+        local = wd.p("models", "faster-whisper-%s" % size)
+        model_dir = local if (local / "model.bin").exists() else             model_home() / ("faster-whisper-%s" % size)
     ensure_model(model_dir, size)
     threads = threads or max(4, (os.cpu_count() or 8) // 2)
     print("加载模型 %s（%d 线程）..." % (model_dir.name, threads), flush=True)
