@@ -27,13 +27,13 @@ def _slug(url: str, meta: dict | None = None) -> str:
 def cmd_doctor(a):
     print("外部工具：")
     for k, v in tool_report().items():
-        print("  %-8s %s" % (k, v or "❌ 未找到"))
-    print("中文字体：%s" % (find_font() or "❌ 未找到（封面生成将跳过）"))
+        print("  %-8s %s" % (k, v or "[X] 未找到"))
+    print("中文字体：%s" % (find_font() or "[X] 未找到（封面生成将跳过）"))
     try:
         import faster_whisper  # noqa
-        print("faster-whisper：✅")
+        print("faster-whisper：[OK]")
     except ImportError:
-        print("faster-whisper：❌ 未安装（pip install faster-whisper）")
+        print("faster-whisper：[X] 未安装（pip install faster-whisper）")
 
 
 def cmd_probe(a):
@@ -50,7 +50,7 @@ def cmd_cookies(a):
     print("cookie 条数 %s | 登录状态 %s | code=%s | 用户=%s"
           % (r.get("count"), r.get("ok"), r.get("code"), r.get("uname")))
     if not r.get("ok"):
-        print("⚠️ 未登录或已过期：请重新登录 B 站后重新导出 cookie，否则拿不到官方字幕（可改用 ASR）")
+        print("[!] 未登录或已过期：请重新登录 B 站后重新导出 cookie，否则拿不到官方字幕（可改用 ASR）")
     return 0 if r.get("ok") else 2
 
 
@@ -173,11 +173,32 @@ def cmd_run(a):
     B.build_docx(wd)
     B.audit(wd)
     wd.mark("build")
-    print("\n✅ 完成：%s" % wd.epub)
+    print("\n[OK] 完成：%s" % wd.epub)
     print("   章节标题若想改，编辑 %s 后重跑：bbook build %s" % (wd.chapters, wd.root))
 
 
+def _fix_console_encoding():
+    """Windows 控制台默认 GBK，有两个坑：
+
+    1. 打印 emoji 时 GBK 编不出来 → UnicodeEncodeError 直接崩；
+    2. 输出被管道/重定向捕获时，若按 GBK 编码，下游（CI、日志、Agent）读到的
+       会是乱码。
+
+    策略：交互式控制台保留原编码但把不可编码字符降级为 '?'；
+    被重定向/管道时切到 UTF-8，保证下游拿到正确文本。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            if not stream.isatty():
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            else:
+                stream.reconfigure(errors="replace")
+        except Exception:
+            pass
+
+
 def main(argv=None):
+    _fix_console_encoding()
     ap = argparse.ArgumentParser(prog="bbook", description="B 站视频 → 电子书")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

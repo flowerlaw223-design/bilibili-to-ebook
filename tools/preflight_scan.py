@@ -9,6 +9,13 @@
 """
 import os, re, sys, argparse
 
+# Windows GBK 控制台兜底：交互式不崩，重定向/管道走 UTF-8
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8", errors="replace") if not _s.isatty()             else _s.reconfigure(errors="replace")
+    except Exception:
+        pass
+
 NAME_PAT = re.compile(
     r'(cookie|credential|secret|tokens?(?![a-z])|password|passwd|\.env|\.pem|\.key$|'
     r'login data|trust tokens|id_rsa|\.netrc|\.npmrc|\.pypirc|serviceaccount)',
@@ -110,7 +117,7 @@ def main():
     print('文件数: %d   合计: %.2f GB' % (n_files, n_bytes / 1073741824))
     dump('阻断项（必须先处理）', blocking)
     dump('警告项（人工确认）', warnings)
-    print('\n结论: %s' % ('❌ 不通过，禁止提交' if blocking else '✅ 通过'))
+    print('\n结论: %s' % ('[X] 不通过，禁止提交' if blocking else '[OK] 通过'))
     return 1 if blocking else 0
 
 
