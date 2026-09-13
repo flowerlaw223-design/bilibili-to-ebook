@@ -1,0 +1,225 @@
+# -*- coding: utf-8 -*-
+"""Phase 4：自动切章 —— 让单视频也能"一条命令出书"。
+
+三级策略（按可靠性排序，前一级失败自动降级）：
+  1. **简介时间点**：UP 主在视频简介里写的 "00:00 章节名"，最权威；
+  2. **幻灯片标题卡**：从 Phase 6 的 OCR 数据里找"短文本段"——正片内容页 80+ 字，
+     标题卡只有二三十字，且带 GEN/第X章/数字编号等标记。实测能把人工切的章
+     复现到 30 秒以内；
+  3. **时长兜底**：按固定分钟数切，标题用该章第一张幻灯片的标题或"第N章"。
+"""
+from __future__ import annotations
+import json, re
+from pathlib import Path
+from .paths import WorkDir
+
+# 幻灯片每帧都有的装饰元素（导航条/角标），只在"清点"时用，绝不删单个汉字
+CHROME_WORDS = {"gen0", "gen1", "gen2", "gen3", "gen4", "gen5", "gen6",
+                "结论", "终论", "genol", "genoi"}
+PAGE_RE = re.compile(r"\b\d{1,3}\s*/\s*\d{1,3}\b")
+
+
+def _tokens(text: str) -> set:
+    return set(re.findall(r"[\u4e00-\u9fff]|[A-Za-z][A-Za-z0-9_\-]+", text))
+
+
+def detect_chrome(frames_ocr: list[dict], ratio: float = 0.4) -> set:
+    """找出几乎每帧都出现的装饰 token。**只考虑拉丁词与显式列表，绝不删单个汉字。**"""
+    freq: dict = {}
+    for o in frames_ocr:
+        for t in _tokens(o.get("text", "")):
+            freq[t] = freq.get(t, 0) + 1
+    n = max(1, len(frames_ocr))
+    chrome = {w.lower() for w in CHROME_WORDS}
+    for t, c in freq.items():
+        if c >= n * ratio and (len(t) > 1 or t.isascii()):
+            chrome.add(t.lower())
+    return chrome
+
+
+def clean_slide(text: str, chrome: set) -> str:
+    """去掉页码、角标与高频装饰词，保留正文。"""
+    t = PAGE_RE.sub(" ", text or "")
+    t = re.sub(r"[\u4e00-\u9fff]+|[A-Za-z][A-Za-z0-9_\-/\.]*|\d+", 
+               lambda m: "" if (m.group(0).isascii() and m.group(0).lower() in chrome)
+               else (" " if (m.group(0) in chrome) else m.group(0)), t)
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+def slide_segments(frames_ocr: list[dict], sim: float = 0.5) -> list[dict]:
+    chrome = detect_chrome(frames_ocr)
+    segs, cur = [], None
+    for o in frames_ocr:
+        ct = clean_slide(o.get("text", ""), chrome)
+        s = _tokens(ct)
+        if cur is None:
+            cur = {"t": o["t"], "texts": [ct], "toks": s}
+            continue
+        j = len(cur["toks"] & s) / max(1, len(cur["toks"] | s))
+        if j >= sim:
+            cur["texts"].append(ct)
+            cur["toks"] |= s
+        else:
+            segs.append(cur)
+            cur = {"t": o["t"], "texts": [ct], "toks": s}
+    if cur:
+        segs.append(cur)
+    out = []
+    for s in segs:
+        best = max(s["texts"], key=len).strip()
+        out.append({"t": s["t"], "text": best, "chars": len(best)})
+    return out
+
+
+# ---------------------------------------------------------------- 策略 1：简介时间点
+TS_RE = re.compile(r"^\s*[\(\[]?((?:\d{1,2}:)?\d{1,2}:\d{2})[\)\]]?\s*[-–—:：]?\s*(.+?)\s*$")
+
+
+def parse_description(desc: str) -> list[dict]:
+    out = []
+    for line in (desc or "").splitlines():
+        m = TS_RE.match(line.strip().lstrip("·-•* "))
+        if not m:
+            continue
+        parts = [int(x) for x in m.group(1).split(":")]
+        secs = parts[0] * 3600 + parts[1] * 60 + parts[2] if len(parts) == 3 else parts[0] * 60 + parts[1]
+        title = m.group(2).strip()
+        if title:
+            out.append({"t": secs, "title": title})
+    return out
+
+
+# ---------------------------------------------------------------- 策略 2：幻灯片标题卡
+TITLE_MARK = re.compile(r"(GEN\s*\d|第\s*[一二三四五六七八九十\d]+\s*[章代]|"
+                        r"^\d{1,2}\s|[·｜|]|规律\s*\d|结论|终论|前瞻|小结|总结)", re.I)
+
+
+def pick_title_cards(segs: list[dict], max_chars: int = 48, min_chars: int = 4) -> list[dict]:
+    cards = []
+    for s in segs:
+        t = s["text"]
+        if not (min_chars <= len(t) <= max_chars):
+            continue
+        if not TITLE_MARK.search(t):
+            continue
+        cards.append(s)
+    # 合并时间过近的标题卡（同一张卡被切成两段）
+    merged = []
+    for c in cards:
+        if merged and c["t"] - merged[-1]["t"] < 30:
+            if len(c["text"]) > len(merged[-1]["text"]):
+                merged[-1] = c
+            continue
+        merged.append(c)
+    return merged
+
+
+def tidy_title(text: str) -> str:
+    t = (text or "").strip()
+    t = re.sub(r"[&§@#]+\s*[A-Za-z]?\d*", " ", t)        # 去掉 "&l500" "&15" 这类 OCR 噪声
+    t = re.sub(r"\s+", " ", t).strip()
+    # 标题卡前面常粘着导航条噪声（'Geno&l503…'），从最后一个结构标记处开始截
+    marks = list(re.finditer(r"(GEN\s*\d|规律\s*\d|第\s*[一二三四五六七八九十\d]+\s*[章代])",
+                             t, re.I))
+    if marks:
+        t = t[marks[-1].start():]
+    t = re.sub(r"^\d{1,3}\s*[.、/]?\s*", "", t)          # 去编号前缀
+    t = re.sub(r"\s+", "", t)
+    t = re.sub(r"^(GEN\s*\d)", r"\1 ", t, flags=re.I)
+    return t.strip()[:40] or "未命名"
+
+
+def chapters_from_slides(paras: list[dict], cards: list[dict]) -> list[dict]:
+    if not cards:
+        return []
+    bounds = [c["t"] for c in cards]
+    chapters, cursor = [], 0
+    for i, c in enumerate(cards):
+        lo_t = bounds[i]
+        hi_t = bounds[i + 1] if i + 1 < len(cards) else float("inf")
+        frm = max(cursor, next((j for j, p in enumerate(paras) if p["end"] >= lo_t), len(paras)))
+        to = max(frm, next((j for j, p in enumerate(paras) if p["start"] >= hi_t), len(paras)))
+        if to <= frm:
+            continue
+        cursor = to
+        chapters.append({"title": tidy_title(c["text"]), "from": frm, "to": to,
+                         "intro": "", "auto": "slides"})
+    if chapters and chapters[0]["from"] > 0:      # 补上开篇
+        chapters.insert(0, {"title": "开篇", "from": 0, "to": chapters[0]["from"],
+                            "intro": "", "auto": "slides"})
+    return chapters
+
+
+# ---------------------------------------------------------------- 策略 3：时长兜底
+def chapters_by_time(paras: list[dict], minutes: float = 8.0, titles: list[dict] | None = None) -> list[dict]:
+    if not paras:
+        return []
+    span = paras[-1]["end"] - paras[0]["start"]
+    n = max(1, round(span / 60 / minutes))
+    size = max(1, len(paras) // n)
+    chapters = []
+    for i in range(0, len(paras), size):
+        seg = paras[i:i + size]
+        lo_t = seg[0]["start"]
+        title = None
+        for t in (titles or []):
+            if t["t"] <= lo_t:
+                title = t["text"]
+        chapters.append({"title": tidy_title(title) if title else "第%d章" % (len(chapters) + 1),
+                         "from": i, "to": min(i + size, len(paras)), "intro": "",
+                         "auto": "time"})
+    return chapters
+
+
+# ---------------------------------------------------------------- 入口
+def auto(wd: WorkDir, strategy: str = "auto", minutes: float = 8.0) -> dict:
+    src = wd.fixed if wd.fixed.exists() else wd.paragraphs
+    if not src.exists():
+        raise RuntimeError("缺少清洗后的段落文件，请先运行 clean 阶段")
+    paras = json.loads(src.read_text(encoding="utf-8"))
+
+    meta = {}
+    if wd.meta.exists():
+        try:
+            meta = json.loads(wd.meta.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+
+    chapters, used = [], "none"
+
+    if strategy in ("auto", "description"):
+        marks = parse_description(meta.get("description", ""))
+        if len(marks) >= 3:
+            bounds = [m["t"] for m in marks]
+            for i, m in enumerate(marks):
+                hi = bounds[i + 1] if i + 1 < len(marks) else float("inf")
+                frm = next((j for j, p in enumerate(paras) if p["end"] >= m["t"]), len(paras))
+                to = next((j for j, p in enumerate(paras) if p["start"] >= hi), len(paras))
+                if to > frm:
+                    chapters.append({"title": tidy_title(m["title"]), "from": frm,
+                                     "to": to, "intro": "", "auto": "description"})
+            if len(chapters) >= 3:
+                used = "description"
+
+    segs = []
+    fo = wd.p("frames_ocr.json")
+    if not chapters and fo.exists() and strategy in ("auto", "slides"):
+        segs = slide_segments(json.loads(fo.read_text(encoding="utf-8")))
+        cards = pick_title_cards(segs)
+        chapters = chapters_from_slides(paras, cards)
+        if len(chapters) >= 3:
+            used = "slides (%d 张标题卡)" % len(cards)
+        else:
+            chapters = []
+
+    if not chapters:
+        titles = [s for s in segs if len(s["text"]) <= 48]
+        chapters = chapters_by_time(paras, minutes, titles)
+        used = "duration fallback"
+
+    wd.chapters.write_text(json.dumps(chapters, ensure_ascii=False, indent=1), encoding="utf-8")
+    print("自动切章：%s → %d 章" % (used, len(chapters)))
+    for i, c in enumerate(chapters, 1):
+        print("  第%2d章 %-34s 段落 %d-%d" % (i, c["title"], c["from"] + 1, c["to"]))
+    return {"strategy": used, "chapters": len(chapters)}

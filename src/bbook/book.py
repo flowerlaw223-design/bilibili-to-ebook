@@ -95,6 +95,10 @@ def build_markdown(wd: WorkDir) -> Path:
                                             sum(len(p["text"]) for p in seg)))
     L.append("")
 
+    fig_by_para = {}
+    for f in figures:
+        fig_by_para.setdefault(f.get("para_index"), []).append(f)
+
     for i, c in enumerate(chapters, 1):
         seg = paras[c["from"]:min(c["to"], len(paras))]
         L += ["# 第%d章 %s" % (i, c["title"]), ""]
@@ -109,16 +113,14 @@ def build_markdown(wd: WorkDir) -> Path:
             L += [head, ""]
         if c.get("intro"):
             L += ["【本章导读】" + c["intro"], ""]
-        fig_at = {}
-        for f in figures:
-            if f.get("chapter") == i:
-                fig_at.setdefault(f.get("para_index"), []).append(f)
+        # 按"段落索引"定位配图，而不是按章号 —— 重新切章后配图不会错位或丢失
         for j, p in enumerate(seg, start=c["from"]):
             L += [p["text"], ""]
-            for f in fig_at.get(j, []):
+            for f in fig_by_para.get(j, []):
                 # 用相对路径（相对 book.md 所在目录）：pandoc 对 Windows 反斜杠绝对路径不可靠。
                 # 合集场景下图片在 part-00N/frames/ 下，路径由 series.merge 预先写入 rel。
-                rel = f.get("rel") or f["file"]
+                rel = f.get("rel") or str(
+                    wd.p("frames", f["file"]).relative_to(wd.root).as_posix())
                 if wd.p(rel).exists():
                     L += ["![%s](%s){width=6.5in}" % (f["caption"], rel), ""]
 
@@ -164,7 +166,8 @@ def build_epub_pandoc(wd: WorkDir) -> Path | None:
 def _xhtml(title: str, body: str) -> str:
     return ('<?xml version="1.0" encoding="utf-8"?>\n'
             '<!DOCTYPE html>\n'
-            '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="zh-CN" lang="zh-CN">\n'
+            '<html xmlns="http://www.w3.org/1999/xhtml"'
+            ' xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="zh-CN" lang="zh-CN">\n'
             "<head><meta charset=\"utf-8\"/><title>%s</title>"
             '<link rel="stylesheet" type="text/css" href="style.css"/></head>\n'
             "<body>\n%s\n</body></html>\n" % (html.escape(title), body))
@@ -208,6 +211,12 @@ def build_epub_pure(wd: WorkDir) -> Path:
                    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n'
                    '<rootfiles><rootfile full-path="OEBPS/content.opf" '
                    'media-type="application/oebps-package+xml"/></rootfiles></container>')
+        # 先补上导航文档，再统一生成 manifest / spine —— 顺序错了会导致 nav 未声明（不合规）
+        nav_lis = "\n".join('<li><a href="%s">%s</a></li>' % (n, html.escape(h))
+                            for n, h in toc)
+        nav_doc = ('<nav epub:type="toc" id="toc"><h1>目录</h1><ol>%s</ol></nav>' % nav_lis)
+        docs.append(("nav.xhtml", "目录", _xhtml("目录", nav_doc)))
+
         z.writestr("OEBPS/style.css", style)
         for name, _, body in docs:
             z.writestr("OEBPS/" + name, body)
@@ -215,17 +224,15 @@ def build_epub_pure(wd: WorkDir) -> Path:
             z.writestr("OEBPS/cover.png", wd.cover.read_bytes())
 
         manifest = "\n".join(
-            '<item id="%s" href="%s" media-type="application/xhtml+xml"/>' % (n[:-6], n)
+            '<item id="%s" href="%s" media-type="application/xhtml+xml"%s/>'
+            % (n[:-6], n, ' properties="nav"' if n == "nav.xhtml" else "")
             for n, _, _ in docs)
         if wd.cover.exists():
             manifest += ('\n<item id="cover-image" href="cover.png" media-type="image/png" '
                          'properties="cover-image"/>')
         manifest += '\n<item id="css" href="style.css" media-type="text/css"/>'
-        spine = "\n".join('<itemref idref="%s"/>' % n[:-6] for n, _, _ in docs)
-        nav_lis = "\n".join('<li><a href="%s">%s</a></li>' % (n, html.escape(h))
-                            for n, h in toc)
-        z.writestr("OEBPS/nav.xhtml", _xhtml("目录", "<nav epub:type=\"toc\" id=\"toc\">"
-                                             "<h1>目录</h1><ol>%s</ol></nav>" % nav_lis))
+        spine = "\n".join('<itemref idref="%s"/>' % n[:-6]
+                           for n, _, _ in docs if n != "nav.xhtml")
         z.writestr("OEBPS/content.opf",
                    '<?xml version="1.0" encoding="utf-8"?>\n'
                    '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
@@ -233,8 +240,12 @@ def build_epub_pure(wd: WorkDir) -> Path:
                    '<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
                    '<dc:identifier id="bookid">urn:uuid:%s</dc:identifier>\n'
                    "<dc:title>%s</dc:title><dc:language>zh-CN</dc:language>\n"
+                   # EPUB3 强制要求：必须声明修改时间
+                   '<meta property="dcterms:modified">%s</meta>\n'
                    "</metadata>\n<manifest>\n%s\n</manifest>\n<spine>\n%s\n</spine>\n"
                    "</package>" % (__import__("uuid").uuid4(), html.escape(title),
+                                   __import__("datetime").datetime.utcnow()
+                                   .strftime("%Y-%m-%dT%H:%M:%SZ"),
                                    manifest, spine))
     print("  [fallback] 使用内置 EPUB 构建器生成（%d 章）" % len(docs))
     return wd.epub

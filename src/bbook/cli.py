@@ -95,6 +95,14 @@ def cmd_series(a):
     print("产物：%s" % wd.epub)
 
 
+def cmd_chapters(a):
+    from . import chapters as C
+    wd = WorkDir(a.workdir)
+    C.auto(wd, strategy=a.strategy, minutes=a.minutes)
+    if a.build:
+        B.build_markdown(wd); B.build_epub(wd); B.build_docx(wd); B.audit(wd)
+
+
 def cmd_clean(a):
     wd = WorkDir(a.workdir)
     T.run(wd, Path(a.terms) if a.terms else None)
@@ -146,17 +154,27 @@ def cmd_run(a):
     T.run(wd, Path(a.terms) if a.terms else None)
     wd.mark("clean")
 
-    if wd.chapters.exists():
-        print("⑤ 构建电子书")
-        B.build_markdown(wd)
-        B.build_epub(wd)
-        B.build_docx(wd)
-        B.audit(wd)
-        wd.mark("build")
-        print("\n✅ 完成：%s" % wd.epub)
-    else:
-        print("\n⚠️ 缺少 %s —— 章节划分需要人工/LLM 决策，请填写后重跑 build。" % wd.chapters)
-        print("   模板：见 examples/chapters.example.json")
+    if not a.no_frames and not wd.p("figures.json").exists():
+        print("⑤ 抽帧配图")
+        from . import frames as FR
+        try:
+            FR.run(wd, url=a.url, interval=a.interval, per_chapter=a.per_chapter)
+        except Exception as e:
+            print("  [warn] 配图失败，跳过：%s" % str(e)[:140])
+
+    if not wd.chapters.exists():
+        print("⑥ 自动切章")
+        from . import chapters as C
+        C.auto(wd, strategy=a.chapter_strategy, minutes=a.chapter_minutes)
+
+    print("⑦ 构建电子书")
+    B.build_markdown(wd)
+    B.build_epub(wd)
+    B.build_docx(wd)
+    B.audit(wd)
+    wd.mark("build")
+    print("\n✅ 完成：%s" % wd.epub)
+    print("   章节标题若想改，编辑 %s 后重跑：bbook build %s" % (wd.chapters, wd.root))
 
 
 def main(argv=None):
@@ -203,6 +221,13 @@ def main(argv=None):
     p.add_argument("--interval", type=int, default=15)
     p.add_argument("--per-chapter", type=int, default=3)
 
+    p = add("chapters", cmd_chapters, help="Phase 4：自动切章（简介时间点 / 幻灯片标题卡 / 时长兜底）")
+    p.add_argument("workdir")
+    p.add_argument("--strategy", default="auto",
+                   choices=["auto", "description", "slides", "time"])
+    p.add_argument("--minutes", type=float, default=8.0, help="时长兜底时每章分钟数")
+    p.add_argument("--build", action="store_true", help="切完章顺手重建电子书")
+
     p = add("clean", cmd_clean, help="Phase 3：清洗 + 术语归正")
     p.add_argument("workdir"); p.add_argument("--terms")
 
@@ -213,6 +238,12 @@ def main(argv=None):
     p.add_argument("url"); p.add_argument("--workdir"); p.add_argument("--cookies")
     p.add_argument("--terms", default="terms/ai-coding.json")
     p.add_argument("--model", default="small"); p.add_argument("--lang", default="zh")
+    p.add_argument("--no-frames", action="store_true", help="跳过抽帧配图")
+    p.add_argument("--interval", type=int, default=10)
+    p.add_argument("--per-chapter", type=int, default=3)
+    p.add_argument("--chapter-strategy", default="auto",
+                   choices=["auto", "description", "slides", "time"])
+    p.add_argument("--chapter-minutes", type=float, default=8.0)
 
     a = ap.parse_args(argv)
     rc = a.func(a)
