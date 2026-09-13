@@ -1,208 +1,234 @@
-# bilibili-to-ebook
+<div align="center">
 
-> 把 B 站视频变成**能坐下来读的电子书**（EPUB3）——本地转写、章节化、术语归正、一键构建。
-> Turn Bilibili videos into readable E-books (EPUB3). Local ASR, chapterization, term correction, one-command build.
+# bbook
+
+**把视频变成能读的书。**
+
+B站 / YouTube 长视频 → 带封面、目录、章节、配图、术语表的 **EPUB**
+
+本地转写 · 自动切章 · 不依赖任何付费 API · **一本约 ¥0.2**
+
+![CI](https://github.com/flowerlaw223-design/bilibili-to-ebook/actions/workflows/ci.yml/badge.svg)
+![License](https://img.shields.io/badge/code-MIT-blue.svg)
+![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
+
+[快速开始](#快速开始) · [看成品](#成品示例) · [为什么不是又一个总结工具](#为什么不是又一个总结工具) · [English](#english)
+
+</div>
+
+![pipeline](assets/pipeline.svg)
 
 ---
 
-## 这个项目解决什么问题
+## 它解决什么问题
 
-B 站上大量高质量的长视频（技术讲解、课程、访谈）**只有视频，没有文字版**：想复习要拖进度条，想检索无从下手，想看只能"看"。
+一门 46 分钟的 B 站技术长视频，你想复习其中"第三代 Agent 的 MCP 协议"那一段。
 
-市面上的总结工具产出的是**摘要**——信息被压缩掉了。这个项目要的是反过来的东西：**信息不丢，但变得可读**。
+- 拖进度条？前前后后找五分钟，还容易漏。
+- 用 AI 总结工具？它给你 500 字摘要，**而你想要的是那 8 分钟里的全部细节**。
+- 自己整理？转录 + 分段 + 切章 + 配图，一个下午就没了。
 
-实测：一个 **45 分 51 秒**的技术长视频 →
-
-- 转写 **878 段 / 16,715 字**
-- 切成 **11 章**（按视频自身的叙述节点，不是等长时间切）
-- 生成 **19 条术语表 + 10 条金句** + 每章导读
-- 产出 **EPUB（含封面、目录、时间轴索引）** + DOCX + Markdown
-- 全程 LLM 成本 **约 ¥0.21**（本地 ASR 免费）
-
-## 为什么便宜
-
-| 环节 | 做法 | 成本 |
-|---|---|---|
-| 下载 / 抽帧 / OCR / 构建 / 校验 | 全部脚本化 | ¥0 |
-| 语音转写 | faster-whisper 本地 CPU | ¥0（46 分钟音频约 13 分钟跑完） |
-| 切章 / 起标题 / 术语归正 | LLM（唯一花钱的地方） | ¥0.2 上下 |
-
-关键纪律：**字幕正文一律落盘、按需分段读，绝不整段贴回对话**。
-把 16k 字原文反复塞进上下文，成本会从 ¥0.2 涨到 ¥20——这是本项目最贵的一课。
-
-## 快速开始（傻瓜式：两条命令）
+**bbook 把这一下午变成一条命令：**
 
 ```bash
-# 1. 安装（把 [all] 带上就是转写 + 配图全功能）
+bbook run "https://www.bilibili.com/video/BVxxxxxxxxxx/"
+```
+
+跑完你会拿到 `work/<视频ID>/book.epub`——**全文一字不少**，但被整理成了能读的形态：
+分好段落、切好章节、配好幻灯片截图、带上术语表和目录。
+
+## 成品示例
+
+<div align="center">
+<img src="assets/demo-cover.png" width="300" alt="示例电子书封面">
+</div>
+
+`examples/` 里有一本**真实产出**的电子书，可以直接下载来看：
+**[AI Agent 编年史（2022—2026 五代演进）· 配图版](examples/AI-Agent编年史-配图版.epub)**（1.7 MB）
+
+| 输入 | 输出 |
+|---|---|
+| 46 分钟 B 站技术视频（纯 PPT 口播） | **11 章** EPUB，1.78 MB |
+| 2750 秒音频 | 878 段转写 → 100 个自然段 / 16,715 字 |
+| | **33 张自动挑选的幻灯片配图**（每章 3 张，图注带真实时间点） |
+| | 19 条术语表 · 10 条金句 · 11 章时间轴索引 |
+| | **正文覆盖 100%**，一字未丢 |
+
+> 该示例视频原片声明 CC BY-SA 4.0，故示例文件同样以 CC BY-SA 4.0 提供（见 `examples/README.md`）。
+> **代码**是 MIT，**示例内容**是 CC BY-SA 4.0，两者分开。
+
+## 为什么不是"又一个总结工具"
+
+这是本项目**唯一重要**的设计立场：
+
+> **市面上绝大多数视频工具产出的是"摘要"——信息被压缩掉了。bbook 产出的是"整理"——信息一条不丢，但变得可读。**
+
+摘要给你结论，整理给你**能自己下结论的材料**。学习、查证、做研究，要的通常是后者。
+
+| | AI 总结工具 | B站官方 AI 字幕 | 人工整理 | **bbook** |
+|---|---|---|---|---|
+| 信息完整度 | 压缩成摘要 | 全文 | 全文 | **全文** |
+| 需要登录 | 否 | **是** | – | **否** |
+| 段落 / 章节 | 无 | 无 | 有 | **自动生成** |
+| 幻灯片配图 | 无 | 无 | 手工截图 | **自动抽帧对齐** |
+| 单本耗时 | 几分钟 | 秒级 | 数小时 | **约 15 分钟（可无人值守）** |
+| 单本成本 | 订阅制 | 免费 | 你的下午 | **约 ¥0.2** |
+
+## 快速开始
+
+```bash
+# 1. 安装（[all] = 本地转写 + 抽帧配图）
 pip install -e ".[all]"
 
 # 2. 出书。对，就这一条。
 bbook run "https://www.bilibili.com/video/BVxxxxxxxxxx/"
+
+# 合集（多 P）也支持：一个分 P 自动成为一章
+bbook series "https://www.bilibili.com/video/BVxxxxxxxxxx/" --limit 3
 ```
 
-跑完你会得到 `work/<视频ID>/book.epub`（含封面、目录、章节、配图、术语表）。
+**它自己会做的事**：取元数据 → 下音频 → 本地转写 → 清洗归正 → 抽帧配图 → **自动切章** →
+生成 EPUB → 结构审计。**全程不需要你回答任何问题。**
 
-**它自己会做的事**：取元数据 → 下音频 → 本地转写 → 清洗归正 → 抽帧配图 →
-**自动切章** → 生成 EPUB → 结构审计。整个过程不需要你回答任何问题。
+**缺东西会降级，不会中途崩**：
 
-**没装的东西会自动降级**，不会中途崩：
-`pandoc` 不在 → 用内置的零依赖 EPUB 构建器；`ffmpeg` 不在 → 跳过配图；
-`faster-whisper` 不在 → 给出安装命令。所以先跑一条 `bbook doctor` 看看缺什么：
+| 缺什么 | 后果 |
+|---|---|
+| `pandoc` | 自动用内置的零依赖 EPUB 构建器（已通过 EPUB3 合规检查） |
+| `ffmpeg` | 跳过配图，其余照常 |
+| `faster-whisper` | 给出安装命令 |
+| `登录 cookie` | 跳过官方字幕，改用本地转写（默认路径就是这样） |
 
-```bash
-bbook doctor        # 检查 yt-dlp / ffmpeg / pandoc / 中文字体 / faster-whisper
-```
+先跑一条 `bbook doctor` 就能看到本机缺什么。
 
 ### 章节标题不满意？
 
-自动切章有三种策略，依次降级：
+自动切章三级降级，**不需要你手动切**：
 
-1. **简介时间点**——UP 主在简介里写了 `00:00 章节名`时最准；
-2. **幻灯片标题卡**——从 OCR 数据里找短文本页（正片内容页 80+ 字，标题卡只有二三十字）。
-   实测能把人工切的章复现到 30 秒以内；
-3. **时长兜底**——按固定分钟数切。
+1. **简介时间点**——UP 主写了 `00:00 章节名` 时最准；
+2. **幻灯片标题卡**——从 OCR 数据里找"短文本页"（内容页 80+ 字，标题卡二三十字）。
+   实测：46 分钟视频自动切出的章节边界，**与人工切分误差在 30 秒以内**；
+3. **时长兜底**。
 
-标题不满意就编辑 `work/<id>/chapters.json`，然后 `bbook build work/<id>` 重建——
-**配图是按段落索引定位的，重新切章不会错位**。
+改 `work/<id>/chapters.json` 后重跑 `bbook build` 即可——
+**配图按段落索引定位，重新切章不会错位**。
 
-想逐步核对（可选）：
+## 工作原理
 
-```bash
-bbook probe    "<url>"  --workdir work/BVxxx    # Phase 1 元数据
-bbook audio    "<url>"  --workdir work/BVxxx    # Phase 2 音频
-bbook asr      work/BVxxx --model small         # Phase 2 本地转写
-bbook clean    work/BVxxx                       # Phase 3 清洗 + 术语归正
-bbook frames   work/BVxxx --url "<url>"         # Phase 6 抽帧配图
-bbook chapters work/BVxxx                       # Phase 4 自动切章
-bbook build    work/BVxxx                       # Phase 7-8 构建 + 审计
-```
-```
-
-**为什么 `run` 会停在章节划分？** 因为"哪里是一章、这一章叫什么"是需要判断的事，
-脚本不猜。你（或 LLM）填好 `chapters.json` 后重跑 `build` 即可。
-
-> 例外：**合集模式不需要人工切章**——一个分 P 天然就是一章，标题直接取 B 站分 P 名。
-
-### 合集 / 多 P：一条命令出一本书
-
-```bash
-python -m bbook series "https://www.bilibili.com/video/BVxxxxxxxxxx/" \
-       --limit 3 \            # 先试跑前 3 个分 P（不填则全部）
-       --parts 1,3,5 \        # 或指定分 P
-       --interval 15 \        # 抽帧间隔
-       --terms terms/ai-coding.json
-```
-
-目录结构：**一个分 P 一个工作目录**，各 P 独立跑完 Phase 1–6，最后合并成一本书：
-
-```
-work/<id>-series/
-├── series.json          合集与分 P 清单
-├── part-001/            该 P 的完整中间产物（与单视频工作目录同构）
-├── part-002/
-├── chapters.json        一章 = 一个分 P
-├── figures.json         合并后的配图（索引已换算为全局段落号）
-└── book.epub
-```
-
-三点实测结论：
-
-1. **不要用 yt-dlp 取分 P 标题**——合集里每个 P 返回的都是同一个合集标题。
-   必须用 B 站 `view` 接口的 `pages[].part`（本项目已内置）。
-2. 分 P 名常带编号和画质后缀（`1-1.课程开场-1080P 高清-AVC`），会自动清洗成 `课程开场`。
-3. 各 P 时间都从 00:00 开始，所以时间轴必须带 P 号（`P1 00:00:00`），否则读者会误以为全书时间连续。
-
-### 断点续跑
-
-每个阶段完成后会写入 `work/<id>/state.json`。中断后重跑 `run` 会跳过已完成的阶段——
-ASR 跑 13 分钟、模型下载 6 分钟，中断一次不必从头再来。
-
-## 流水线（Phase 1–8）
-
-| Phase | 做什么 | 产物 |
+| Phase | 做什么 | 关键点 |
 |---|---|---|
-| 1 | 元数据与分 P 清单 | `meta.json` |
-| 2 | 字幕获取（官方 cookie 优先，否则音频 + ASR） | `asr_segments.json` |
-| 3 | 清洗：合并短句、去噪、**术语归正**、段落化 | `cleaned_paragraphs.json` |
-| 4 | 章节切分（简介时间点 > 多 P > 语义转折 > 时长兜底） | `chapters.json` |
-| 5 | 口语 → 书面改写（可选，保真红线见下） | — |
-| 6 | 关键帧抽帧 + OCR + 字幕带过滤 + 幻灯片聚类配图 | `figures.json` + `frames/*.jpg` |
-| 7 | EPUB / DOCX 构建（pandoc） | `book.epub` |
-| 8 | 审计：覆盖对账 + EPUB 结构校验 | `EBOOK_AUDIT.md` |
+| 1 | 元数据 / 分 P 清单 | 无需登录；**分 P 标题必须走 B站 view 接口**（yt-dlp 对合集里每个 P 返回同一个标题） |
+| 2 | 字幕（需登录）或音频 | 拿不到官方字幕就本地 ASR，**不阻塞** |
+| 3 | 清洗 + 术语归正 | 合并短句、去语气词、**68 条术语表**修正同音错字 |
+| 4 | 自动切章 | 见上 |
+| 6 | 抽帧 + OCR 配图 | **丢弃画面底部字幕带**（不丢的话每帧都有字，人脸与幻灯片无法区分） |
+| 7 | EPUB / DOCX 构建 | pandoc 优先，内置纯 Python 构建器兜底 |
+| 8 | 审计 | 覆盖对账 + EPUB 结构校验 |
 
-**保真红线**：改写只允许补标点、删口头禅、合并重复、顺语序；
+> Phase 6 要跑在 Phase 4 **之前**：幻灯片的 OCR 结果是自动切章的输入。`bbook run` 已按此编排。
+
+**保真红线**：改写只允许补标点、删口头禅、合并重复、顺语序。
 **不得添加视频里没说过的事实、数据、结论**。拿不到画面就如实标注，绝不生成假图。
 
-## 实测结论（避免你重复踩坑）
+## 成本
 
-| 事项 | 结论 |
+| 环节 | 成本 |
 |---|---|
-| 视频元数据 | ✅ 无需登录即可获取 |
-| 官方 CC / AI 字幕 | ❌ **必须登录**，否则只列出弹幕 |
-| 音频流 | ✅ 无需登录（m4a 最高 122k） |
-| 弹幕 | ✅ 无需登录 |
-| cookie 有效期 | ⚠️ 通常十几天，用前先验 `isLogin` |
-| B 站搜索接口 | ❌ 风控（412），请直接传 BV 号 |
-| pandoc 2.12 | ⚠️ 不支持 `--split-level`；无 xelatex 则不能直出 PDF |
-| 术语归正 | ⚠️ **不能用 `\b`**：中英之间无词边界，必须用 lookaround |
-| huggingface_hub | ⚠️ 可能下载失败，改用 requests 直拉模型文件（已内置该回退） |
-| Windows 管道输出 | ⚠️ 控制台默认 GBK，非 tty 时强制 UTF-8，否则打印 emoji 会直接崩 |
-| 幻灯片标题卡 | ⚠️ 阈值不能"自适应"：幻灯片长度均匀时会把阈值压到 20 出头，一张卡都认不出 |
+| 下载 / 抽帧 / OCR / 构建 / 校验 | **¥0**（全脚本化，不花 token） |
+| 语音转写 | **¥0**（faster-whisper 本地 CPU，46 分钟音频约 13 分钟跑完） |
+| 切章 / 起标题 / 整理 | **约 ¥0.2**（唯一花钱的地方） |
+
+对比：把 16k 字原文整段塞进上下文反复对话，成本会从 ¥0.2 涨到 ¥20。
+**所以本项目最贵的一课是上下文纪律**——字幕正文一律落盘、按需分段读。
+
+## 已知限制（不粉饰）
+
+- **自动切章切不出"子章节"**：它复原的是作者自己的分段（如 PPT 上的 GEN0–GEN4），做不出比作者更细的切分。要更细仍需人工过一遍。
+- **ASR 会错专有名词**：本地转写把 "DeepSeek Harness" 听成过 "deep sink honeys"。术语表能修已知的，修不了没见过的。
+- **没有官方字幕准**：B站 AI 字幕需登录。我们用本地 ASR 换来的是"零登录、零依赖、可离线"。
+- **EPUB 合规检查是自研的**：W3C EPUBCheck 需要 Java，尚未接入 CI。
+- **未验证平台**：除 B站 / YouTube 外未实测；理论上 yt-dlp 支持的站点都可用。
+
+## 常见坑（我们替你踩过了）
+
+| 坑 | 后果 | 我们的处理 |
+|---|---|---|
+| 中英之间没有词边界 | `\bjason\b` 在"的 Jason"里永远匹配不到 | 术语替换一律用 lookaround |
+| 幻灯片每帧都有导航条/页码 | 分不清封面与内容页 | 自动识别高频装饰 token，**只过滤拉丁词与装饰词，绝不删单个汉字** |
+| 标题卡阈值"自适应" | 幻灯片长度均匀时阈值被压到 20 出头，一张卡都认不出 | 回退为固定值，实测验证 |
+| pandoc 按 cwd 解析图片路径 | 插图变成指向 EPUB 外部的死链，**且不报错** | 统一在工作目录内执行 |
+| Windows 控制台是 GBK | 打印 emoji 直接 UnicodeEncodeError | 非 tty 强制 UTF-8，交互式降级为 `?` |
+| huggingface_hub 下载模型失败 | 卡在第一步 | 改用 requests 直拉，带回镜像回退 |
+
+## 开发
+
+```bash
+pip install -e ".[dev]"
+python -m pytest tests -q          # 20 个用例，0.5 秒跑完，不需要模型
+python tools/preflight_scan.py .   # 发布前扫描：凭据 / 大文件 / 版权风险
+```
+
+测试全部使用合成夹具，**不需要下载模型、不需要 ffmpeg/pandoc**，因此 CI 上几秒就能跑完。
 
 ## 目录结构
 
 ```
-bilibili-to-ebook/
-├── README.md · SECURITY.md · LICENSE · pyproject.toml · .gitignore
-├── .github/workflows/ci.yml        # Linux + Windows × py3.9/3.12，跑测试与发布前扫描
-├── skills/
-│   └── SKILL_BILIBILI_TO_EBOOK.md  # 流水线权威指令（给 LLM / 人读的规范）
-├── src/bbook/                      # 实现（11 个模块）
-│   ├── paths.py     工作目录契约 · 断点续跑状态 · 跨平台字体/工具探测
-│   ├── fetch.py     Phase 1-2：元数据 / 官方字幕 / 音频 / 弹幕 / cookie 校验
-│   ├── asr.py       Phase 2：faster-whisper 本地转写（模型自动下载、镜像回退）
-│   ├── text.py      Phase 3：段落化 + 术语归正（CJK 安全 lookaround）
-│   ├── chapters.py  Phase 4：自动切章（简介时间点 → 幻灯片标题卡 → 时长兜底）
-│   ├── frames.py    Phase 6：抽帧 + OCR + 字幕带过滤 + 幻灯片聚类
-│   ├── book.py      Phase 7-8：Markdown / EPUB / DOCX 构建 + 审计
-│   ├── series.py    多 P / 合集 → 一整本书
-│   └── cli.py       CLI 入口（12 个子命令）
-├── terms/ai-coding.json            # 可插拔术语表（AI / 编程领域，68 条）
-├── tests/                          # pytest 用例 + 假数据夹具（不需要模型即可跑）
-│   ├── test_text.py · test_chapters.py · test_book.py · test_paths.py
-│   └── fixtures/                   # 合成 ASR 分段 / 幻灯片 OCR / 视频简介
-└── tools/preflight_scan.py         # 发布前扫描：凭据 / 大文件 / 版权风险
+src/bbook/         实现（11 个模块）
+  paths.py         工作目录契约 · 断点续跑 · 跨平台字体/工具探测
+  fetch.py         Phase 1-2：元数据 / 字幕 / 音频 / 弹幕 / cookie 校验
+  asr.py           Phase 2：本地转写（模型自动下载 + 镜像回退）
+  text.py          Phase 3：段落化 + 术语归正
+  chapters.py      Phase 4：自动切章（三级降级）
+  frames.py        Phase 6：抽帧 + OCR + 幻灯片聚类
+  book.py          Phase 7-8：构建 + 审计
+  series.py        多 P / 合集 → 一本书
+  cli.py           CLI（12 个子命令）
+terms/             可插拔术语表
+skills/            流水线规范（给 LLM / 人读的权威指令）
+tests/             pytest 用例 + 合成夹具
+tools/             发布前安全检查
 ```
-
-> `examples/`（用 CC 授权视频产出的示例电子书）与 `docs/` 尚未创建，见路线图。
 
 ## 路线图
 
-- [x] **CLI 化**：`bbook probe/audio/asr/clean/build/run` 单入口，**零硬编码路径**
-- [x] **断点续跑**：阶段状态写入 `state.json`，重跑自动跳过已完成阶段
-- [x] **术语表插件化**：`terms/ai-coding.json`（68 条），可继续加金融 / 医学等
-- [x] **零依赖 EPUB 构建**：内置纯 Python EPUB3 构建器，pandoc 缺失时自动回退
-- [x] **跨平台**：字体自动探测（Windows / macOS / Linux），无 PowerShell 依赖
-- [x] **配图版**：抽帧 + OCR + 字幕带过滤 + 幻灯片聚类 → 每章 3 张图（`bbook frames`）
-- [ ] **精编版**：口语 → 书面改写（默认不做，保真是当前底线）
-- [ ] **精编版**：口语 → 书面改写
-- [ ] **配图版**：抽帧 + OCR 插入章节
-- [x] **多 P / 合集** → 一整本书：**一章 = 一个分 P**，标题自动取自 B 站分 P 名（`bbook series`）
-- [ ] **可点击时间戳**：EPUB 内链跳回视频对应秒数
-- [x] **自动切章**：简介时间点 → 幻灯片标题卡 → 时长兜底，三级自动降级（`bbook chapters`）
-- [x] **打包安装**：`pip install -e ".[all"]` + `bbook` 命令
-- [ ] **CI**：假 ASR 输出的 golden test + lint（不需要下载模型即可跑）
-- [ ] **EPUBCheck 集成**：目前只有自研结构检查；W3C 官方校验器需要 Java
-- [ ] **兜底构建器已修**：nav 命名空间 / manifest properties="nav" / dcterms:modified 均已补齐
+- [x] 单视频一条命令出书（自动切章）
+- [x] 多 P / 合集 → 一整本书
+- [x] 抽帧配图 · 术语归正 · 断点续跑 · 零依赖兜底构建器
+- [x] 测试 + CI（Linux / Windows × py3.9 / 3.12）
+- [ ] 接入 W3C EPUBCheck（需 Java）
+- [ ] 官方字幕 vs 本地 ASR 的质量 A/B
+- [ ] 精编版：口语 → 书面改写（**默认关闭，保真优先**）
+- [ ] 多语言输出
 
-## 版权与致谢
+## 许可与免责
 
-- 本项目**只做格式转换，不产生内容**。生成物的版权归原视频作者所有。
-- 若原视频标注 CC BY-SA 4.0 等协议，请遵守署名与相同方式共享要求。
-- 请勿将生成物用于商业分发。
-- 灵感与验证来自实际把 Stanford MS&E435 课程与 B 站技术视频做成可读文本的过程。
+- **代码**：MIT（见 `LICENSE`）
+- **`examples/` 中的示例电子书**：CC BY-SA 4.0（跟随原视频授权）
+- 本项目**只做格式转换，不产生内容**。生成物版权归原视频作者所有。
+- 请遵守目标平台的服务条款；**请勿将生成物用于商业分发**。
 
-## License
+---
 
-- 代码：**MIT**（待定，欢迎建议）
-- 文档与 Skill：**CC BY-SA 4.0**
+<a id="english"></a>
+
+## English
+
+**bbook turns long videos into readable E-books.**
+
+Bilibili / YouTube → EPUB3 with cover, TOC, chapters, slide figures and a glossary.
+Local ASR (free, offline), automatic chaptering, no paid API required. **~$0.03 worth of LLM tokens per book.**
+
+```bash
+pip install -e ".[all]"
+bbook run "https://www.bilibili.com/video/BVxxxxxxxxxx/"
+```
+
+**Why not another summarizer?** Summarizers compress the information away. bbook keeps
+every word and makes it *readable*: real paragraphs, real chapters, real figures pulled
+from the video's own slides.
+
+**Measured on a 46-minute technical talk:** 11 chapters, 33 auto-selected slide figures,
+100% transcript coverage, 1.78 MB EPUB, ~13 min of CPU transcription, ~$0.03 of LLM cost.
+
+See `examples/` for a real output you can download and read.

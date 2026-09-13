@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 260" width="1000" height="260" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif">
+  <defs>
+    <marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 z" fill="#8aa0b8"/>
+    </marker>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1f2937"/><stop offset="100%" stop-color="#111827"/>
+    </linearGradient>
+  </defs>
+  <rect width="1000" height="260" rx="14" fill="#f8fafc"/>
+  <text x="500" y="40" text-anchor="middle" font-size="19" font-weight="700" fill="#0f172a">一条命令，视频变电子书</text>
+  <text x="500" y="64" text-anchor="middle" font-size="13" fill="#64748b">bbook run "&lt;视频链接&gt;"　—　全程本地，无需人工介入</text>
+
+  <g>
+    <rect x="30" y="92" width="150" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="105" y="126" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">视频</text>
+    <text x="105" y="150" text-anchor="middle" font-size="11.5" fill="#64748b">B站 / YouTube</text>
+    <text x="105" y="170" text-anchor="middle" font-size="11.5" fill="#64748b">单集 · 多P合集</text>
+  </g>
+  <line x1="186" y1="144" x2="222" y2="144" stroke="#8aa0b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="228" y="92" width="176" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="316" y="122" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">本地转写</text>
+    <text x="316" y="146" text-anchor="middle" font-size="11.5" fill="#64748b">faster-whisper</text>
+    <text x="316" y="165" text-anchor="middle" font-size="11.5" fill="#64748b">术语归正 68 条</text>
+    <text x="316" y="184" text-anchor="middle" font-size="11.5" fill="#16a34a">免费 · 离线</text>
+  </g>
+  <line x1="410" y1="144" x2="446" y2="144" stroke="#8aa0b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="452" y="92" width="176" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="540" y="122" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">自动切章</text>
+    <text x="540" y="146" text-anchor="middle" font-size="11.5" fill="#64748b">简介时间点</text>
+    <text x="540" y="165" text-anchor="middle" font-size="11.5" fill="#64748b">幻灯片标题卡</text>
+    <text x="540" y="184" text-anchor="middle" font-size="11.5" fill="#64748b">时长兜底</text>
+  </g>
+  <line x1="634" y1="144" x2="670" y2="144" stroke="#8aa0b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="676" y="92" width="130" height="104" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="741" y="122" text-anchor="middle" font-size="14" font-weight="600" fill="#0f172a">抽帧配图</text>
+    <text x="741" y="146" text-anchor="middle" font-size="11.5" fill="#64748b">OCR 识别幻灯片</text>
+    <text x="741" y="165" text-anchor="middle" font-size="11.5" fill="#64748b">过滤底部字幕</text>
+    <text x="741" y="184" text-anchor="middle" font-size="11.5" fill="#64748b">每章 3 张</text>
+  </g>
+  <line x1="812" y1="144" x2="848" y2="144" stroke="#8aa0b8" stroke-width="2" marker-end="url(#a)"/>
+
+  <g>
+    <rect x="854" y="92" width="118" height="104" rx="10" fill="url(#g)" stroke="#0f172a"/>
+    <text x="913" y="126" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">EPUB</text>
+    <text x="913" y="150" text-anchor="middle" font-size="11" fill="#cbd5e1">封面 · 目录</text>
+    <text x="913" y="169" text-anchor="middle" font-size="11" fill="#cbd5e1">章节 · 配图</text>
+    <text x="913" y="188" text-anchor="middle" font-size="11" fill="#cbd5e1">术语表 · 金句</text>
+  </g>
+
+  <text x="500" y="234" text-anchor="middle" font-size="11.5" fill="#94a3b8">实测：46 分钟视频 → 11 章 / 33 张配图 / 覆盖 100% ｜ 转写 13 分钟（CPU） ｜ 成本约 ¥0.2</text>
+</svg>
