@@ -129,19 +129,35 @@ def pick_title_cards(segs: list[dict], max_chars: int = 48, min_chars: int = 4) 
     return merged
 
 
-def tidy_title(text: str) -> str:
+JUNK_PREFIX = re.compile(
+    r"^(?:[&§@#]+|[lI1]\s?\d{1,4}[A-Za-z]{0,3}|\d{1,3}|Geno|GENO|EO|OE)\s*", re.I)
+
+
+def tidy_title(text: str, max_len: int = 38) -> str:
+    """把 OCR 出来的幻灯片文字整成能当标题/图注的样子。
+
+    保留词间空格（OCR 本来就按文本块分了空格，全删会变成一坨），
+    只清掉开头的导航条残渣和页码。
+    """
     t = (text or "").strip()
-    t = re.sub(r"[&§@#]+\s*[A-Za-z]?\d*", " ", t)        # 去掉 "&l500" "&15" 这类 OCR 噪声
+    t = re.sub(r"[&§@#]+\s*[A-Za-z]?\d*", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
-    # 标题卡前面常粘着导航条噪声（'Geno&l503…'），从最后一个结构标记处开始截
+    for _ in range(3):                       # 残渣可能叠好几层
+        t2 = JUNK_PREFIX.sub("", t).strip()
+        if t2 == t:
+            break
+        t = t2
     marks = list(re.finditer(r"(GEN\s*\d|规律\s*\d|第\s*[一二三四五六七八九十\d]+\s*[章代])",
                              t, re.I))
-    if marks:
+    if marks and marks[-1].start() < 40:     # 前面都是导航条
         t = t[marks[-1].start():]
-    t = re.sub(r"^\d{1,3}\s*[.、/]?\s*", "", t)          # 去编号前缀
-    t = re.sub(r"\s+", "", t)
-    t = re.sub(r"^(GEN\s*\d)", r"\1 ", t, flags=re.I)
-    return t.strip()[:40] or "未命名"
+    t = re.sub(r"^(GEN\s*\d)\s*[/·]?\s*", r"\1 ", t, flags=re.I)
+    t = re.sub(r"\s+", " ", t).strip(" -_·./")
+    if len(t) > max_len:
+        cut = t[:max_len]
+        sp = cut.rfind(" ")
+        t = (cut[:sp] if sp > max_len * 0.5 else cut).rstrip() + "…"
+    return t or "未命名"
 
 
 def chapters_from_slides(paras: list[dict], cards: list[dict]) -> list[dict]:

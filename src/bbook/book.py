@@ -95,9 +95,11 @@ def build_markdown(wd: WorkDir) -> Path:
                                             sum(len(p["text"]) for p in seg)))
     L.append("")
 
+    # 按 (插入位置, 段落索引) 归档：pos=before 表示"他开始讲这张图"之前插入
     fig_by_para = {}
     for f in figures:
-        fig_by_para.setdefault(f.get("para_index"), []).append(f)
+        key = (f.get("pos", "after"), f.get("para_index"))
+        fig_by_para.setdefault(key, []).append(f)
 
     for i, c in enumerate(chapters, 1):
         seg = paras[c["from"]:min(c["to"], len(paras))]
@@ -113,16 +115,21 @@ def build_markdown(wd: WorkDir) -> Path:
             L += [head, ""]
         if c.get("intro"):
             L += ["【本章导读】" + c["intro"], ""]
-        # 按"段落索引"定位配图，而不是按章号 —— 重新切章后配图不会错位或丢失
-        for j, p in enumerate(seg, start=c["from"]):
-            L += [p["text"], ""]
-            for f in fig_by_para.get(j, []):
-                # 用相对路径（相对 book.md 所在目录）：pandoc 对 Windows 反斜杠绝对路径不可靠。
-                # 合集场景下图片在 part-00N/frames/ 下，路径由 series.merge 预先写入 rel。
+        # 配图按"段落索引"定位，不按章号 —— 重新切章后不会错位或丢失。
+        # 图片路径用相对路径：pandoc 对 Windows 反斜杠绝对路径不可靠；
+        # 合集里图片在 part-00N/frames/ 下，路径由 series.merge 预先写进 rel。
+        def emit(figs):
+            # 注意：闭包内不能用 L += （会被当成局部变量），必须用 extend
+            for f in figs:
                 rel = f.get("rel") or str(
                     wd.p("frames", f["file"]).relative_to(wd.root).as_posix())
                 if wd.p(rel).exists():
-                    L += ["![%s](%s){width=6.5in}" % (f["caption"], rel), ""]
+                    L.extend(["![%s](%s){width=6.5in}" % (f["caption"], rel), ""])
+
+        for j, p in enumerate(seg, start=c["from"]):
+            emit(fig_by_para.get(("before", j), []))   # 他刚翻到这张图
+            L += [p["text"], ""]
+            emit(fig_by_para.get(("after", j), []))
 
     if terms:
         L += ["# 附录A · 术语表", "", "| 术语 | 说明 | 出现位置 |", "|---|---|---|"]

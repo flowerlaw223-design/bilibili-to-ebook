@@ -103,6 +103,14 @@ def cmd_chapters(a):
         B.build_markdown(wd); B.build_epub(wd); B.build_docx(wd); B.audit(wd)
 
 
+def cmd_align(a):
+    from . import align as A
+    wd = WorkDir(a.workdir)
+    A.run(wd, max_per_chapter=a.per_chapter)
+    if a.build:
+        B.build_markdown(wd); B.build_epub(wd); B.build_docx(wd); B.audit(wd)
+
+
 def cmd_clean(a):
     wd = WorkDir(a.workdir)
     T.run(wd, Path(a.terms) if a.terms else None)
@@ -166,6 +174,14 @@ def cmd_run(a):
         print("⑥ 自动切章")
         from . import chapters as C
         C.auto(wd, strategy=a.chapter_strategy, minutes=a.chapter_minutes)
+
+    if not a.no_frames:
+        print("⑥′ 图文对齐：把讲解挂到对应幻灯片上")
+        from . import align as AL
+        try:
+            AL.run(wd, max_per_chapter=a.per_chapter)
+        except Exception as e:
+            print("  [warn] 对齐失败，改用旧配图逻辑：%s" % str(e)[:140])
 
     print("⑦ 构建电子书")
     B.build_markdown(wd)
@@ -241,6 +257,11 @@ def main(argv=None):
     p.add_argument("--no-frames", action="store_true")
     p.add_argument("--interval", type=int, default=15)
     p.add_argument("--per-chapter", type=int, default=3)
+
+    p = add("align", cmd_align, help="Phase 6.5：图文对齐（把讲解挂到对应的幻灯片上）")
+    p.add_argument("workdir")
+    p.add_argument("--per-chapter", type=int, default=8, help="每章最多几张图")
+    p.add_argument("--build", action="store_true", help="对齐完顺手重建电子书")
 
     p = add("chapters", cmd_chapters, help="Phase 4：自动切章（简介时间点 / 幻灯片标题卡 / 时长兜底）")
     p.add_argument("workdir")
