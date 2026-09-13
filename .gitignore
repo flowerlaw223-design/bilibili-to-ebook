@@ -1,0 +1,79 @@
+# ---- 凭据 / 隐私：绝对不能提交 ----
+*cookie*
+*cookies*
+!tools/*cookie*.py
+SESSDATA*
+.env
+.env.*
+*.pem
+*.key
+Login Data*
+Trust Tokens*
+*credential*
+*secret*
+*.netrc
+.npmrc
+.pypirc
+
+# ---- 浏览器配置副本（含完整登录态，体积大且极度敏感）----
+chrome_profile*/
+chrome_cap*/
+chrome_*/
+User Data/
+cookies_work/
+cookies_copy/
+
+# ---- 受版权保护的素材 ----
+Geekbang_*/
+*极客时间*
+*专栏导出*
+*课程逐字稿*
+*.zip
+
+# ---- 大体积媒体与模型 ----
+*.mp4
+*.mkv
+*.flv
+*.m4a
+*.mp3
+*.wav
+*.vtt
+*.srt
+*.ass
+models/
+*.bin
+*.onnx
+*.tflite
+*.wasm
+frames/
+frames_*/
+slides/
+slides_*/
+audio/
+
+# ---- 运行期产物（保留少量示例即可）----
+_work*/
+.smoke/
+work/
+*.jsonl
+*.jsonl.zstd
+*.log
+**/asr_segments.json
+**/cleaned_paragraphs*.json
+**/cur*.jsonl
+**/old.jsonl
+
+# ---- 依赖 / 环境 ----
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# ---- 编辑器 / 系统 ----
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
