@@ -10,7 +10,7 @@
 import os, re, sys, argparse
 
 NAME_PAT = re.compile(
-    r'(cookie|credential|secret|token|password|passwd|\.env|\.pem|\.key$|'
+    r'(cookie|credential|secret|tokens?(?![a-z])|password|passwd|\.env|\.pem|\.key$|'
     r'login data|trust tokens|id_rsa|\.netrc|\.npmrc|\.pypirc|serviceaccount)',
     re.I)
 # 要求"键 = 值"形态，避免文档里提到 SESSDATA 这类词造成误报
@@ -53,6 +53,10 @@ def main():
 
     for dirpath, dirnames, filenames in os.walk(a.root):
         base = os.path.basename(dirpath)
+        # 整个目录若已被 .gitignore 覆盖，直接跳过（它根本不会进仓库）
+        if base in ignored and os.path.dirname(os.path.abspath(dirpath)) == root_abs:
+            dirnames[:] = []
+            continue
         if RISK_DIR.search(base):
             # 已被 .gitignore 覆盖，或位于扫描根目录自身 —— 都只提示不阻断；
             # 出现在子目录里且未被忽略，才说明有问题（嵌套仓库、忘删缓存）。
