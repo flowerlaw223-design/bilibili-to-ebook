@@ -116,8 +116,22 @@ def cmd_clean(a):
     T.run(wd, Path(a.terms) if a.terms else None)
 
 
+def _ensure_cover(wd):
+    """没有封面就生成一张 —— 单视频流程以前漏了这步。"""
+    if wd.cover.exists():
+        return
+    try:
+        meta = json.loads(wd.book_meta.read_text(encoding="utf-8")) \
+            if wd.book_meta.exists() else {}
+        title = (meta.get("title") or "视频电子书")[:14]
+        B.make_cover(wd, title + "\n精读", (meta.get("subtitle") or "")[:24], "由 bbook 生成")
+    except Exception as e:
+        print("  [warn] 封面生成失败：%s" % str(e)[:120])
+
+
 def cmd_build(a):
     wd = WorkDir(a.workdir)
+    _ensure_cover(wd)
     B.build_markdown(wd)
     B.build_epub(wd)
     B.build_docx(wd)
@@ -166,7 +180,8 @@ def cmd_run(a):
         print("⑤ 抽帧配图")
         from . import frames as FR
         try:
-            FR.run(wd, url=a.url, interval=a.interval, per_chapter=a.per_chapter)
+            FR.run(wd, url=a.url, interval=a.interval,
+                   max_per_chapter=a.per_chapter)
         except Exception as e:
             print("  [warn] 配图失败，跳过：%s" % str(e)[:140])
 
@@ -184,6 +199,15 @@ def cmd_run(a):
             print("  [warn] 对齐失败，改用旧配图逻辑：%s" % str(e)[:140])
 
     print("⑦ 构建电子书")
+    if not wd.cover.exists():
+        try:
+            meta = json.loads(wd.book_meta.read_text(encoding="utf-8")) \
+                if wd.book_meta.exists() else {}
+            title = meta.get("title") or "视频电子书"
+            B.make_cover(wd, title[:14] + "\n精读", (meta.get("subtitle") or "")[:22],
+                         "由 bbook 生成")
+        except Exception as e:
+            print("  [warn] 封面生成失败：%s" % str(e)[:120])
     B.build_markdown(wd)
     B.build_epub(wd)
     B.build_docx(wd)

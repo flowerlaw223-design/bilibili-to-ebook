@@ -24,17 +24,45 @@ def _tokens(text: str) -> set:
     return set(re.findall(r"[\u4e00-\u9fff]|[A-Za-z][A-Za-z0-9_\-]*", text))
 
 
-def detect_chrome(frames_ocr: list[dict], ratio: float = 0.4) -> set:
-    """找出几乎每帧都出现的装饰 token。**只考虑拉丁词与显式列表，绝不删单个汉字。**"""
-    freq: dict = {}
-    for o in frames_ocr:
-        for t in _tokens(o.get("text", "")):
-            freq[t] = freq.get(t, 0) + 1
+def detect_chrome(frames_ocr: list[dict], ratio: float = 0.4,
+                  gram_ratio: float = 0.6, gram_min: int = 2,
+                  isolated_ratio: float = 0.3) -> set:
+    """找出几乎每帧都出现的装饰元素（角标、常驻标题栏、页码）。
+
+    两类都抓：
+      1. 单词级：拉丁词、装饰词；
+      2. 汉字长 n-gram：中文没空格，单字频率毫无意义（"的"当然每帧都有），
+         必须用 4 字以上的片段 —— 常驻标题栏"我的面试复盘"就是靠这个抓出来的。
+    """
     n = max(1, len(frames_ocr))
+    freq: dict = {}
+    grams: dict = {}
+    isolated: dict = {}
+    for o in frames_ocr:
+        raw = o.get("text", "") or ""
+        for t in _tokens(raw):
+            freq[t] = freq.get(t, 0) + 1
+        seen = set()
+        for run in re.findall(r"[\u4e00-\u9fff]+", raw):
+            for size in range(gram_min, min(9, len(run) + 1)):
+                for i in range(len(run) - size + 1):
+                    seen.add(run[i:i + size])
+        for g in seen:
+            grams[g] = grams.get(g, 0) + 1
+        # 被空格单独隔开的汉字 —— 多是图标被 OCR 认成的单字（"品""白""心"）
+        for ch in re.findall(r"(?<!\S)[\u4e00-\u9fff](?!\S)", raw):
+            isolated[ch] = isolated.get(ch, 0) + 1
+
     chrome = {w.lower() for w in CHROME_WORDS}
     for t, c in freq.items():
         if c >= n * ratio and (len(t) > 1 or t.isascii()):
             chrome.add(t.lower())
+    for g, c in grams.items():
+        if len(g) >= gram_min and c >= n * gram_ratio:
+            chrome.add(g)
+    for ch, c in isolated.items():
+        if c >= n * isolated_ratio:
+            chrome.add(ch)
     return chrome
 
 
@@ -44,6 +72,11 @@ def clean_slide(text: str, chrome: set) -> str:
     t = re.sub(r"[\u4e00-\u9fff]+|[A-Za-z][A-Za-z0-9_\-/\.]*|\d+", 
                lambda m: "" if (m.group(0).isascii() and m.group(0).lower() in chrome)
                else (" " if (m.group(0) in chrome) else m.group(0)), t)
+    for g in sorted((c for c in chrome if not c.isascii() and len(c) >= 2),
+                    key=len, reverse=True):        # 常驻标题栏：长的先清
+        t = t.replace(g, " ")
+    t = re.sub(r"(?:^|\s)([\u4e00-\u9fff])(?=\s|$)",
+               lambda m: " " if m.group(1) in chrome else m.group(0), t)   # 孤立单字噪声
     t = re.sub(r"[&§@#]+", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
     return t

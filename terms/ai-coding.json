@@ -73,6 +73,18 @@
     "眼省逻辑": "演进逻辑",
     "回馆": "回滚",
     "沙河隔离": "沙箱隔离",
-    "核实验证": "何时验证"
+    "核实验证": "何时验证",
+    "副盘": "复盘",
+    "腹排": "复盘",
+    "秋召": "秋招",
+    "大蒙线": "大模型",
+    "卡不卡": "Kafka",
+    "long graph": "LangGraph",
+    "绕个": "LangGraph",
+    "郎却郎华": "LangChain、LangGraph",
+    "test to circle": "Text-to-SQL",
+    "taster to circle": "Text-to-SQL",
+    "circle的查询接口": "SQL 的查询接口",
+    "其买在": "其实在"
   }
 }
