@@ -37,8 +37,8 @@ def test_img_sig_is_scale_invariant(tmp_path):
         ImageDraw.Draw(im).rectangle([8, 8, 40, 28], fill=200 + off)
         im.save(path)
     sa, sb = A._img_sig(a), A._img_sig(b)
-    assert sa is not None and sb is not None
-    assert float((sa * sb).mean()) > 0.95, "亮度不同但结构相同的图，应当判为高度相似"
+    assert sa is not None and sb is not None, "签名不该依赖 numpy，PIL 就够"
+    assert A._sig_sim(sa, sb) > 0.95, "亮度不同但结构相同的图，应当判为高度相似"
 
 
 def test_missing_frames_dir_does_not_crash():

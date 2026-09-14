@@ -73,15 +73,31 @@ def _grams(text: str, n: int = 4) -> set:
 
 
 def _img_sig(path, w: int = 32, h: int = 18):
-    """单元格化灰度签名，用于"这两张图长得像不像"。版式相同、文字不同的两屏，
-    文字指标量不出来，但像素会很像 —— 这道闸门专治这种情况。"""
+    """缩略灰度签名（归一化到均值 0、方差 1），用于判断"这两张图长得像不像"。
+
+    版式相同、文字不同的两屏，文字指标量不出来，但像素会很像 —— 这道闸门专治这种情况。
+    刻意不用 numpy：本机装了 numpy 时能跑，但 CI 和用户机器上没装，
+    结果这道闸门会静默失效（CI 就是这么抓到的）。PIL 本来就是必需依赖，
+    576 个像素用纯 Python 算绰绰有余。
+    """
     try:
         from PIL import Image
-        import numpy as np
-        a = np.asarray(Image.open(path).convert("L").resize((w, h)), dtype="float32") / 255.0
-        return (a - a.mean()) / (a.std() + 1e-6)
+        a = [float(v) for v in Image.open(path).convert("L").resize((w, h)).getdata()]
     except Exception:
         return None
+    n = len(a)
+    if not n:
+        return None
+    mean = sum(a) / n
+    sd = (sum((v - mean) ** 2 for v in a) / n) ** 0.5 or 1e-6
+    return [(v - mean) / sd for v in a]
+
+
+def _sig_sim(a, b) -> float:
+    """两个签名的相关系数。缺任一侧就返回 0（等于"不相似"，不拦）。"""
+    if not a or not b or len(a) != len(b):
+        return 0.0
+    return sum(x * y for x, y in zip(a, b)) / len(a)
 
 
 def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
@@ -108,7 +124,7 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
     if frames_dir is not None:
         sigs_all = [_img_sig(Path(frames_dir) / f["file"]) for f in frames_ocr
                     if f.get("file")]
-        adj = [float((a * b).mean()) for a, b in zip(sigs_all, sigs_all[1:])
+        adj = [_sig_sim(a, b) for a, b in zip(sigs_all, sigs_all[1:])
                if a is not None and b is not None]
         if adj:
             adj.sort()
@@ -140,7 +156,7 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
             img_dup = 0.0
             for _, ps in recent:
                 if ps is not None:
-                    img_dup = max(img_dup, float((sig * ps).mean()))
+                    img_dup = max(img_dup, _sig_sim(sig, ps))
             if recent and img_dup > eff_img_sim:
                 continue
         else:
