@@ -17,6 +17,35 @@ from .paths import WorkDir
 from . import chapters as C
 
 
+# 界面外壳的高频词：浏览器书签栏、Office 菜单、地址栏……录屏共享时 OCR 全是这些
+UI_WORDS = re.compile(
+    r"(文件|开始|插入|引用|邮件|视图|帮助|格式|窗口|编辑|搜索|书签|收藏|地址|设置|"
+    r"登录|注册|下载|客户端|首页|推荐|热门|频道|订阅|分享|评论|点赞|关注|退出|保存|"
+    r"另存为|打印|缩放|布局|审阅|设计|开发者|兼容性|工具箱)")
+URLISH = re.compile(r"(www\.|https?://|\.com|\.cn|\.net|\.org|VPN)", re.I)
+# 浏览器书签栏、导航站的品牌名 —— 一屏里堆上三四个就基本可以确定是书签栏
+BRANDS = re.compile(
+    r"(百度|京东|淘宝|天猫|小红书|知乎|微博|豆瓣|哔哩|bilibili|唯品会|58同城|"
+    r"1688|网易|腾讯|新浪|搜狐|贴吧|抖音|快手|美团|携程|去哪儿|12306)", re.I)
+
+
+def looks_like_ui_chrome(text: str) -> bool:
+    """判断这段 OCR 是不是"界面外壳"而不是内容。
+
+    录屏共享时，画面文字最多的那一帧往往就是浏览器书签栏 / Office 菜单栏，
+    而我们的选帧又偏爱文字多的帧 —— 结果就是主动挑中垃圾。
+    这里判定为外壳的，图注就退化成中性的"视频 XX:XX 处画面"，宁可朴素不要垃圾。
+    """
+    t = text or ""
+    if len(re.findall(r"[\u4e00-\u9fff]", t)) < 4:
+        return True                       # 几乎没有中文，多半是菜单/路径
+    if URLISH.search(t):
+        return True
+    if len(BRANDS.findall(t)) >= 3:
+        return True                        # 书签栏
+    return len(UI_WORDS.findall(t)) >= 3
+
+
 def _grams(text: str, n: int = 4) -> set:
     """句子级指纹：字符 n-gram。
 
@@ -60,6 +89,8 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
         ct = C.clean_slide(f.get("text", ""), chrome)
         if len(ct) < min_chars:
             continue
+        if looks_like_ui_chrome(ct):
+            continue                       # 界面外壳不是内容，别让它占一个图位
         g = _grams(ct)
         if not g:
             continue
@@ -173,7 +204,10 @@ def to_figures(wd: WorkDir, slides: list[dict], chapters: list[dict],
                 "file": s["file"], "t": s["t0"], "t1": s["t1"],
                 "t_str": "%02d:%02d:%02d" % (hh, mm, ss),
                 "title": s["title"],
-                "caption": "图 %d-%d　%s" % (ci, k, s["title"]),
+                "caption": ("图 %d-%d　%s" % (ci, k, s["title"]))
+                if not looks_like_ui_chrome(s["title"])
+                else ("图 %d-%d　视频 %s 处画面" % (ci, k, "%02d:%02d:%02d" % (hh, mm, ss))),
+                "caption_fallback": looks_like_ui_chrome(s["title"]),
                 "span": round(s["t1"] - s["t0"], 1),
                 "dup_to_prev": s.get("dup_to_prev"),
                 "ocr": s["text"][:160],
