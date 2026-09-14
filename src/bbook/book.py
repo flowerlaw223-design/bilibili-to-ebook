@@ -80,7 +80,17 @@ def build_markdown(wd: WorkDir) -> Path:
             L.append('%s: "%s"' % (k, str(v).replace('"', "'")))
     L += ["---", ""]
     if meta.get("about"):
-        L += ["# 关于本书", ""] + meta["about"].split("\n") + [""]
+        about = meta["about"].split("\n")
+        nf = wd.p("no_figures.json")
+        if not figures and nf.exists():
+            try:
+                info = json.loads(nf.read_text(encoding="utf-8"))
+                about += ["", "**关于配图**：本片属于口播型视频，全片可用的内容画面只有 %d 个"
+                              "（其余均为软件界面），因此本书不配图。"
+                          % info.get("content_frames", 0)]
+            except Exception:
+                pass
+        L += ["# 关于本书", ""] + about + [""]
 
     L += ["# 目录与时间轴", "", "| 章 | 标题 | 视频时间 | 字数 |", "|---|---|---|---|"]
     def stamp(c, seg):

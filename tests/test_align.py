@@ -71,6 +71,24 @@ def test_run_writes_slides_and_figures(tmp_path):
          for i in range(4)], ensure_ascii=False), encoding="utf-8")
     wd.p("frames_ocr.json").write_text(json.dumps(load_frames(), ensure_ascii=False),
                                        encoding="utf-8")
-    res = A.run(wd)
+    res = A.run(wd, min_content_frames=0)          # 关掉口播判定，专测配图产出
     assert res["slides"] > 0 and res["figures"] > 0
     assert wd.p("slides.json").exists() and wd.p("figures.json").exists()
+
+
+def test_talking_head_video_gets_no_figures(tmp_path):
+    """内容画面太少的视频不配图 —— 硬配出来的只是片头卡/片尾卡这类装饰图。"""
+    wd = WorkDir(tmp_path / "w")
+    (wd.asr).write_text(json.dumps(load_segs(), ensure_ascii=False), encoding="utf-8")
+    (wd.chapters).write_text(json.dumps([{"title": "A", "from": 0, "to": 3, "intro": ""}],
+                                        ensure_ascii=False), encoding="utf-8")
+    (wd.fixed).write_text(json.dumps(
+        [{"start": i * 10.0, "end": i * 10.0 + 9, "t": "00:00:%02d" % i, "text": "正文"}
+         for i in range(4)], ensure_ascii=False), encoding="utf-8")
+    wd.p("frames_ocr.json").write_text(json.dumps(load_frames(), ensure_ascii=False),
+                                       encoding="utf-8")
+    res = A.run(wd)                                 # 默认 min_content_frames=5
+    assert res["figures"] == 0 and res["skipped"] == "talking_head"
+    assert json.loads(wd.p("figures.json").read_text(encoding="utf-8")) == []
+    marker = json.loads(wd.p("no_figures.json").read_text(encoding="utf-8"))
+    assert marker["reason"] == "talking_head" and marker["content_frames"] > 0

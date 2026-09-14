@@ -249,7 +249,7 @@ def to_figures(wd: WorkDir, slides: list[dict], chapters: list[dict],
 
 
 def run(wd: WorkDir, max_per_chapter: int = 12, max_sim: float = 0.35,
-        max_img_sim: float = 0.66) -> dict:
+        max_img_sim: float = 0.66, min_content_frames: int = 5) -> dict:
     """读 frames_ocr.json + asr_segments.json + chapters.json，产出 slides.json / figures.json。"""
     fo = wd.p("frames_ocr.json")
     if not fo.exists():
@@ -267,6 +267,25 @@ def run(wd: WorkDir, max_per_chapter: int = 12, max_sim: float = 0.35,
     slides = select_representatives(frames, max_sim=max_sim, frames_dir=wd.p("frames"),
                                     max_img_sim=max_img_sim)
     slides = attach_speech(slides, segments)
+
+    # 内容画面太少 = 这是一支口播视频，画面里本来就没东西可配。
+    # 硬配出来的只会是片头卡、片尾卡、更新预告这类与正文重复的装饰图，
+    # 所以整本不配图 —— 更干净，也更诚实。
+    marker = wd.p("no_figures.json")
+    if len(slides) < min_content_frames:
+        wd.p("slides.json").write_text(json.dumps(slides, ensure_ascii=False, indent=1),
+                                       encoding="utf-8")
+        wd.p("figures.json").write_text("[]", encoding="utf-8")
+        marker.write_text(json.dumps(
+            {"reason": "talking_head", "content_frames": len(slides)},
+            ensure_ascii=False, indent=1), encoding="utf-8")
+        print("图文对齐：全片仅 %d 个内容画面（< %d）→ 判定为口播型，**不配图**"
+              % (len(slides), min_content_frames))
+        return {"slides": len(slides), "matched": len(slides), "figures": 0,
+                "skipped": "talking_head"}
+    if marker.exists():
+        marker.unlink()
+
     figs = to_figures(wd, slides, chapters, paras, max_per_chapter=max_per_chapter)
 
     wd.p("slides.json").write_text(json.dumps(slides, ensure_ascii=False, indent=1),
