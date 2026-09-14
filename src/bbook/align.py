@@ -143,6 +143,7 @@ def to_figures(wd: WorkDir, slides: list[dict], chapters: list[dict],
                 "title": s["title"],
                 "caption": "图 %d-%d　%s" % (ci, k, s["title"]),
                 "span": round(s["t1"] - s["t0"], 1),
+                "dup_to_prev": s.get("dup_to_prev"),
                 "ocr": s["text"][:160],
                 "speech": s["speech"][:600],
             })
