@@ -67,8 +67,15 @@ def detect_chrome(frames_ocr: list[dict], ratio: float = 0.4,
 
 
 def clean_slide(text: str, chrome: set) -> str:
-    """去掉页码、角标与高频装饰词，保留正文。"""
-    t = PAGE_RE.sub(" ", text or "")
+    """去掉页码、角标与高频装饰词，保留正文。
+
+    带保险丝：如果照规则清完之后剩下的汉字不到原文的三成，说明判定错了
+    （典型场景：样本很少时，每帧都一样的正文被当成"角标"整段删掉），
+    这时退回只去页码。宁可留点噪声，也不能把正文吃光。
+    """
+    raw = text or ""
+    n_all = len(re.findall(r"[\u4e00-\u9fff]", raw))
+    t = PAGE_RE.sub(" ", raw)
     t = re.sub(r"[\u4e00-\u9fff]+|[A-Za-z][A-Za-z0-9_\-/\.]*|\d+", 
                lambda m: "" if (m.group(0).isascii() and m.group(0).lower() in chrome)
                else (" " if (m.group(0) in chrome) else m.group(0)), t)
@@ -79,6 +86,8 @@ def clean_slide(text: str, chrome: set) -> str:
                lambda m: " " if m.group(1) in chrome else m.group(0), t)   # 孤立单字噪声
     t = re.sub(r"[&§@#]+", " ", t)
     t = re.sub(r"\s+", " ", t).strip()
+    if n_all >= 8 and len(re.findall(r"[\u4e00-\u9fff]", t)) < n_all * 0.3:
+        return PAGE_RE.sub(" ", raw).strip()       # 保险丝：清过头了，退回轻清
     return t
 
 
