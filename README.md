@@ -10,7 +10,7 @@ B站和 YouTube 上的长视频，早就成了最重要的学习渠道。<br>
 
 60 分钟的视频，模型成本两毛钱左右。
 
-![CI](https://img.shields.io/badge/CI-pending%20workflow%20scope-lightgrey.svg)
+![CI](https://github.com/flowerlaw223-design/bilibili-to-ebook/actions/workflows/ci.yml/badge.svg)
 ![License](https://img.shields.io/badge/code-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)
