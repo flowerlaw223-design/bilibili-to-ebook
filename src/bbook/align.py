@@ -28,8 +28,22 @@ def _grams(text: str, n: int = 4) -> set:
     return {t[i:i + n] for i in range(len(t) - n + 1)}
 
 
+def _img_sig(path, w: int = 32, h: int = 18):
+    """单元格化灰度签名，用于"这两张图长得像不像"。版式相同、文字不同的两屏，
+    文字指标量不出来，但像素会很像 —— 这道闸门专治这种情况。"""
+    try:
+        from PIL import Image
+        import numpy as np
+        a = np.asarray(Image.open(path).convert("L").resize((w, h)), dtype="float32") / 255.0
+        return (a - a.mean()) / (a.std() + 1e-6)
+    except Exception:
+        return None
+
+
 def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
-                           min_chars: int = 8, tail: float = 10.0) -> list[dict]:
+                           min_chars: int = 8, tail: float = 10.0,
+                           window: int = 4, max_img_sim: float = 0.66,
+                           frames_dir=None) -> list[dict]:
     """选出"互相不一样"的代表帧：只和**上一张入选图**比，重复度超过 max_sim 就跳过。
 
     为什么不用"相邻帧聚类"（换页检测）：那是给 PPT 设计的。
@@ -41,7 +55,7 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
     """
     chrome = C.detect_chrome(frames_ocr)
     picks: list[dict] = []
-    last: set | None = None
+    recent: list[tuple] = []          # 最近 window 张的 (文字指纹, 图像签名)
     for f in frames_ocr:
         ct = C.clean_slide(f.get("text", ""), chrome)
         if len(ct) < min_chars:
@@ -49,13 +63,31 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
         g = _grams(ct)
         if not g:
             continue
-        dup = 1.0 if last is None else len(g & last) / max(1, len(g | last))
-        if picks and dup > max_sim:
+        # 文字闸门：跟最近 window 张都比（只比上一张会漏掉"隔一张的近重复"）
+        dup = 0.0
+        for pg, _ in recent:
+            dup = max(dup, len(g & pg) / max(1, len(g | pg)))
+        if recent and dup > max_sim:
             continue
+        # 图像闸门：版式相同、文字不同的两屏，靠像素拦
+        sig = None
+        if frames_dir is not None and f.get("file"):
+            sig = _img_sig(Path(frames_dir) / f["file"])
+        if sig is not None:
+            img_dup = 0.0
+            for _, ps in recent:
+                if ps is not None:
+                    img_dup = max(img_dup, float((sig * ps).mean()))
+            if recent and img_dup > max_img_sim:
+                continue
+        else:
+            img_dup = 0.0
         picks.append({"t0": f["t"], "file": f.get("file"), "text": ct,
                       "title": C.tidy_title(ct), "chars": len(ct),
-                      "dup_to_prev": round(dup, 2)})
-        last = g
+                      "dup_to_prev": round(dup, 2), "img_dup": round(img_dup, 2)})
+        recent.append((g, sig))
+        if len(recent) > window:
+            recent.pop(0)
     for i, s in enumerate(picks):
         s["t1"] = picks[i + 1]["t0"] if i + 1 < len(picks) else s["t0"] + tail
     return picks
@@ -150,7 +182,8 @@ def to_figures(wd: WorkDir, slides: list[dict], chapters: list[dict],
     return figures
 
 
-def run(wd: WorkDir, max_per_chapter: int = 12, max_sim: float = 0.35) -> dict:
+def run(wd: WorkDir, max_per_chapter: int = 12, max_sim: float = 0.35,
+        max_img_sim: float = 0.66) -> dict:
     """读 frames_ocr.json + asr_segments.json + chapters.json，产出 slides.json / figures.json。"""
     fo = wd.p("frames_ocr.json")
     if not fo.exists():
@@ -165,7 +198,8 @@ def run(wd: WorkDir, max_per_chapter: int = 12, max_sim: float = 0.35) -> dict:
     src = wd.fixed if wd.fixed.exists() else wd.paragraphs
     paras = json.loads(src.read_text(encoding="utf-8"))
 
-    slides = select_representatives(frames, max_sim=max_sim)
+    slides = select_representatives(frames, max_sim=max_sim, frames_dir=wd.p("frames"),
+                                    max_img_sim=max_img_sim)
     slides = attach_speech(slides, segments)
     figs = to_figures(wd, slides, chapters, paras, max_per_chapter=max_per_chapter)
 
