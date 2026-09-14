@@ -18,10 +18,18 @@ from . import chapters as C
 
 
 # 界面外壳的高频词：浏览器书签栏、Office 菜单、地址栏……录屏共享时 OCR 全是这些
+# 只认「Office 功能区 / 浏览器外壳」独有的痕迹。
+# 踩过的坑：早先用了"工具/设计/搜索/格式/设置"这类泛词，结果把讲技术方案的
+# PPT 整本判成菜单栏（49 张 -> 2 张）。泛词绝不能用来判界面。
 UI_WORDS = re.compile(
-    r"(文件|开始|插入|引用|邮件|视图|帮助|格式|窗口|编辑|搜索|书签|收藏|地址|设置|"
-    r"登录|注册|下载|客户端|首页|推荐|热门|频道|订阅|分享|评论|点赞|关注|退出|保存|"
-    r"另存为|打印|缩放|布局|审阅|设计|开发者|兼容性|工具箱)")
+    r"(另存为|兼容性模式|已保存到|工具箱|页眉|页脚|批注|修订|字数统计|缩放比例|"
+    r"默认版式|邮件合并|目录级别|样式窗格|阅读模式|沉浸式阅读)")
+# 泛化的菜单词：单独出现说明不了问题（技术 PPT 里也有"工具""设计""格式"），
+# 必须配合下一条判据一起用
+MENU_WORDS = re.compile(r"(文件|开始|插入|引用|邮件|视图|审阅|帮助|格式|窗口|编辑|"
+                        r"工具箱|另存为|批注|页眉|页脚)")
+# 虚词密度：真正的句子离不开"的了是在和就也都很"，菜单栏里几乎没有
+FUNC_CHARS = re.compile(r"[的了是在和就也都很把被让对与及其这那有为以并而且但]")
 URLISH = re.compile(r"(www\.|https?://|\.com|\.cn|\.net|\.org|VPN)", re.I)
 # 浏览器书签栏、导航站的品牌名 —— 一屏里堆上三四个就基本可以确定是书签栏
 BRANDS = re.compile(
@@ -43,7 +51,14 @@ def looks_like_ui_chrome(text: str) -> bool:
         return True
     if len(BRANDS.findall(t)) >= 3:
         return True                        # 书签栏
-    return len(UI_WORDS.findall(t)) >= 3
+    if len(UI_WORDS.findall(t)) >= 3:
+        return True                        # Office 功能区专属痕迹
+    # 菜单栏特征：一堆菜单词，却没有一句像人话
+    if len(MENU_WORDS.findall(t)) >= 3:
+        density = len(FUNC_CHARS.findall(t)) / max(1, len(t))
+        if density < 0.03:
+            return True
+    return False
 
 
 def _grams(text: str, n: int = 4) -> set:
@@ -83,6 +98,25 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
     同时每一帧的内容都能被某张入选图覆盖到（不是靠丢帧换来的）。
     """
     chrome = C.detect_chrome(frames_ocr)
+
+    # 图像闸门必须先知道自己这条视频的"视觉基线"：
+    # PPT 全场共用一套模板（相邻帧像素相似度中位 96%），滚动文档只有 57%。
+    # 用固定阈值必然误伤模板统一的视频（实测把 PPT 那本从 49 张打到 2 张）。
+    # 规则：闸门永远不低于本视频自己的基线。
+    sigs_eff = {}
+    eff_img_sim = max_img_sim
+    if frames_dir is not None:
+        sigs_all = [_img_sig(Path(frames_dir) / f["file"]) for f in frames_ocr
+                    if f.get("file")]
+        adj = [float((a * b).mean()) for a, b in zip(sigs_all, sigs_all[1:])
+               if a is not None and b is not None]
+        if adj:
+            adj.sort()
+            baseline = adj[len(adj) // 2]
+            eff_img_sim = max(max_img_sim, baseline)
+            for f, s in zip(frames_ocr, sigs_all):
+                sigs_eff[f.get("file")] = s
+
     picks: list[dict] = []
     recent: list[tuple] = []          # 最近 window 张的 (文字指纹, 图像签名)
     for f in frames_ocr:
@@ -101,15 +135,13 @@ def select_representatives(frames_ocr: list[dict], max_sim: float = 0.35,
         if recent and dup > max_sim:
             continue
         # 图像闸门：版式相同、文字不同的两屏，靠像素拦
-        sig = None
-        if frames_dir is not None and f.get("file"):
-            sig = _img_sig(Path(frames_dir) / f["file"])
+        sig = sigs_eff.get(f.get("file")) if sigs_eff else None
         if sig is not None:
             img_dup = 0.0
             for _, ps in recent:
                 if ps is not None:
                     img_dup = max(img_dup, float((sig * ps).mean()))
-            if recent and img_dup > max_img_sim:
+            if recent and img_dup > eff_img_sim:
                 continue
         else:
             img_dup = 0.0
