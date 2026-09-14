@@ -268,7 +268,7 @@ def main(argv=None):
     p.add_argument("workdir"); p.add_argument("--url")
     p.add_argument("--interval", type=int, default=10, help="抽帧间隔秒数")
     p.add_argument("--max-height", type=int, default=720)
-    p.add_argument("--per-chapter", type=int, default=3, help="每章最多几张图")
+    p.add_argument("--per-chapter", type=int, default=12, help="每章最多几张图")
     p.add_argument("--min-chars", type=int, default=20, help="判定幻灯片的最少字数")
     p.add_argument("--cookies")
 
@@ -280,11 +280,11 @@ def main(argv=None):
     p.add_argument("--cookies"); p.add_argument("--model", default="small")
     p.add_argument("--no-frames", action="store_true")
     p.add_argument("--interval", type=int, default=15)
-    p.add_argument("--per-chapter", type=int, default=3)
+    p.add_argument("--per-chapter", type=int, default=12)
 
     p = add("align", cmd_align, help="Phase 6.5：图文对齐（把讲解挂到对应的幻灯片上）")
     p.add_argument("workdir")
-    p.add_argument("--per-chapter", type=int, default=8, help="每章最多几张图")
+    p.add_argument("--per-chapter", type=int, default=12, help="每章最多几张图")
     p.add_argument("--build", action="store_true", help="对齐完顺手重建电子书")
 
     p = add("chapters", cmd_chapters, help="Phase 4：自动切章（简介时间点 / 幻灯片标题卡 / 时长兜底）")
@@ -306,7 +306,8 @@ def main(argv=None):
     p.add_argument("--model", default="small"); p.add_argument("--lang", default="zh")
     p.add_argument("--no-frames", action="store_true", help="跳过抽帧配图")
     p.add_argument("--interval", type=int, default=10)
-    p.add_argument("--per-chapter", type=int, default=3)
+    p.add_argument("--per-chapter", type=int, default=12,
+                   help="每章最多几张图（与 align 命令保持一致，避免两条路径结果不同）")
     p.add_argument("--chapter-strategy", default="auto",
                    choices=["auto", "description", "slides", "time"])
     p.add_argument("--chapter-minutes", type=float, default=8.0)

@@ -234,9 +234,11 @@ def chapters_by_time(paras: list[dict], minutes: float = 8.0, titles: list[dict]
     for i in range(0, len(paras), size):
         seg = paras[i:i + size]
         lo_t = seg[0]["start"]
+        # 只在"看起来像标题"时才拿来当章名：随便抓一句正文当标题会产出垃圾
+        # （实测出现过"你想让我们在 阅读中构建什么？"这种）
         title = None
         for t in (titles or []):
-            if t["t"] <= lo_t:
+            if t["t"] <= lo_t and TITLE_MARK.search(t["text"] or ""):
                 title = t["text"]
         chapters.append({"title": tidy_title(title) if title else "第%d章" % (len(chapters) + 1),
                          "from": i, "to": min(i + size, len(paras)), "intro": "",
